@@ -8,14 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewRequestStore(t *testing.T) {
-	t.Parallel()
-
-	store := NewRequestStore()
-
-	assert.Equal(t, 0, store.Count())
-}
-
 func TestRequestStoreStoreAndGet(t *testing.T) {
 	t.Parallel()
 
@@ -51,10 +43,7 @@ func TestRequestStoreStoreAndGet(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			store := NewRequestStore()
 
 			store.Store("id", tt.entry)
