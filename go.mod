@@ -7,6 +7,7 @@ require (
 	github.com/mark3labs/mcp-go v0.43.2
 	github.com/projectdiscovery/interactsh v1.2.4
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/sys v0.28.0
 )
 
 require (
@@ -130,7 +131,6 @@ require (
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect

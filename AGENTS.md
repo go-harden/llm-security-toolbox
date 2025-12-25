@@ -49,8 +49,10 @@ sectool/
 │   │   ├── flow.go       # Flow ID → Burp offset mapping (thread-safe)
 │   │   ├── hash.go       # Content hashing for flow identity
 │   │   └── request.go    # Replay result storage with TTL cleanup
-│   └── ids/              # Short ID generation
-│       └── ids.go        # Base62 random IDs using crypto/rand
+│   ├── ids/              # Short ID generation
+│   │   └── ids.go        # Base62 random IDs using crypto/rand
+│   ├── socket_security.go        # Secure listener wrapper, socket path validation
+│   └── socket_security_{linux,darwin,other}.go  # Peer credential verification (SO_PEERCRED/LOCAL_PEERCRED)
 ├── proxy/               # Proxy history CLI
 │   ├── flags.go         # Subcommand parsing (list/export/intercept/rule)
 │   └── proxy.go         # Command implementations
@@ -78,7 +80,7 @@ sectool/
 4. Daemon connects to Burp MCP and starts OAST backend
 5. All CLI commands communicate with daemon via Unix socket at `.sectool/service/socket`
 
-**State directory layout:**
+**State directory layout (0700 permissions, peer UID validation on socket):**
 ```
 .sectool/
 ├── config.json           # Version, BurpMCPURL, preserve_guides flag
@@ -86,8 +88,8 @@ sectool/
 ├── AGENT-test-report.md  # Generated guide (if init test-report)
 ├── service/
 │   ├── pid               # PID file with exclusive flock
-│   ├── socket            # Unix domain socket
-│   └── log.txt           # Service logs (append-only)
+│   ├── socket            # Unix domain socket; validates peer UID on accept
+│   └── log.txt           # Service logs (0600, append-only)
 └── requests/             # Exported request bundles
     └── <bundle_id>/
         ├── request.http       # HTTP headers with body placeholder

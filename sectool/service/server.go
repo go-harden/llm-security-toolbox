@@ -97,9 +97,9 @@ func (s *Server) Run(ctx context.Context) error {
 	defer markStarted() // even on error we consider it started (then immediately stopped)
 
 	// Ensure directories exist
-	if err := os.MkdirAll(s.paths.ServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(s.paths.ServiceDir, 0700); err != nil {
 		return fmt.Errorf("failed to create service directory: %w", err)
-	} else if err := os.MkdirAll(s.paths.RequestsDir, 0755); err != nil {
+	} else if err := os.MkdirAll(s.paths.RequestsDir, 0700); err != nil {
 		return fmt.Errorf("failed to create requests directory: %w", err)
 	}
 
@@ -274,7 +274,13 @@ func (s *Server) createListener() error {
 		return err
 	}
 
-	s.listener = listener
+	// Wrap with credential verification (verifies peer UID matches server UID)
+	s.listener = wrapListenerWithCredentialCheck(listener)
+	if peerCredentialsSupported() {
+		log.Printf("peer credential verification enabled")
+	} else {
+		log.Printf("peer credential verification not supported on this platform")
+	}
 	return nil
 }
 

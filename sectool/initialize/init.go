@@ -40,7 +40,7 @@ func run(mode string, reset bool) error {
 	}
 
 	// Create directory structure
-	if err := os.MkdirAll(paths.SectoolDir, 0755); err != nil {
+	if err := os.MkdirAll(paths.SectoolDir, 0700); err != nil {
 		return fmt.Errorf("failed to create .sectool directory: %w", err)
 	}
 

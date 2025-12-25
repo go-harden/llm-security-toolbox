@@ -70,6 +70,13 @@ func (c *Client) LogPath() string {
 
 // EnsureService ensures the service is running, starting it if necessary.
 func (c *Client) EnsureService(ctx context.Context) error {
+	// Validate socket path security if directory exists (before connecting)
+	if _, err := os.Stat(c.paths.ServiceDir); err == nil {
+		if err := ValidateSocketPathSecurity(c.paths.SocketPath); err != nil {
+			return fmt.Errorf("socket security validation failed: %w", err)
+		}
+	}
+
 	if c.CheckHealth(ctx) == nil {
 		return nil
 	}
@@ -135,7 +142,7 @@ func (c *Client) Status(ctx context.Context) (*ServiceStatus, error) {
 // startService starts the service daemon. Concurrent start attempts are safe
 // due to the server's flock-based mutual exclusion.
 func (c *Client) startService(ctx context.Context) error {
-	if err := os.MkdirAll(c.paths.ServiceDir, 0755); err != nil {
+	if err := os.MkdirAll(c.paths.ServiceDir, 0700); err != nil {
 		return fmt.Errorf("failed to create service directory: %w", err)
 	}
 	c.cleanupStaleSocket()
@@ -179,7 +186,7 @@ func (c *Client) spawnServiceProcess() error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	logFile, err := os.OpenFile(c.paths.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(c.paths.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
