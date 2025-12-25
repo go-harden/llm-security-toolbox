@@ -43,7 +43,6 @@ func TestRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			var r *os.File
 			var w *os.File
@@ -90,10 +89,7 @@ func TestEncodeURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			result, err := encodeURL(tt.input, tt.decode)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expect, result)
@@ -117,10 +113,7 @@ func TestEncodeBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			result, err := encodeBase64(tt.input, tt.decode)
 			if tt.wantErr != "" {
 				assert.Error(t, err)
@@ -148,10 +141,7 @@ func TestEncodeHTML(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			result, err := encodeHTML(tt.input, tt.decode)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expect, result)
