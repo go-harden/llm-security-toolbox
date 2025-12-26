@@ -16,7 +16,9 @@ make build
 
 ### 2. Set up Burp Suite with MCP
 
-Install [Burp Suite Community](https://portswigger.net/burp/communitydownload) and add the MCP extension from the BApp Store. Start Burp and ensure the MCP server is running on `http://127.0.0.1:9876/sse`.
+Install [Burp Suite Community](https://portswigger.net/burp/communitydownload) and add the MCP extension from the BApp Store.
+
+Start Burp and ensure the MCP server is running on `http://127.0.0.1:9876/sse`. It's best if your burp session starts fresh without a proxy history for when starting with your agent.
 
 > Note: Burp MCP is currently required. A built-in proxy is planned for future releases ([#3](https://github.com/jentfoo/llm-security-toolbox/issues/3)).
 
