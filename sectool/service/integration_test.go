@@ -11,10 +11,14 @@ import (
 
 	"github.com/jentfoo/llm-security-toolbox/sectool/config"
 	"github.com/jentfoo/llm-security-toolbox/sectool/service/mcp"
+	"github.com/jentfoo/llm-security-toolbox/sectool/service/testutil"
 )
 
 func connectBurpOrSkip(t *testing.T) *mcp.BurpClient {
 	t.Helper()
+
+	// Acquire exclusive lock to prevent concurrent MCP connections across packages
+	_ = testutil.AcquireBurpLock(t)
 
 	client := mcp.New(config.DefaultBurpMCPURL)
 	err := client.Connect(t.Context())

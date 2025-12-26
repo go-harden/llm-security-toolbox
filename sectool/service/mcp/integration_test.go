@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jentfoo/llm-security-toolbox/sectool/config"
+	"github.com/jentfoo/llm-security-toolbox/sectool/service/testutil"
 )
 
 // Integration tests for Burp MCP client.
@@ -17,6 +18,9 @@ import (
 
 func connectOrSkip(t *testing.T, ctx context.Context) *BurpClient {
 	t.Helper()
+
+	// Acquire exclusive lock to prevent concurrent MCP connections across packages
+	_ = testutil.AcquireBurpLock(t)
 
 	client := New(config.DefaultBurpMCPURL)
 	err := client.Connect(ctx)
@@ -55,8 +59,9 @@ func TestBurpGetProxyHistory_Empty(t *testing.T) {
 
 	client := connectOrSkip(t, ctx)
 
-	// Fetch with high offset to likely get empty results
-	entries, err := client.GetProxyHistory(ctx, 10, 999999)
+	// Fetch with moderately high offset to likely get empty results
+	// Using 9999 instead of 999999 to avoid potential performance issues with Burp MCP
+	entries, err := client.GetProxyHistory(ctx, 10, 9999)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
 }
