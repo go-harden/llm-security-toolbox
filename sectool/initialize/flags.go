@@ -21,11 +21,38 @@ func Parse(args []string) error {
 	fs.Usage = func() {
 		_, _ = fmt.Fprint(os.Stderr, `Usage: sectool init <mode> [options]
 
-Initialize working directory for agent work.
+Initialize working directory for security agent work.
 
-Modes:
-  test-report  Create guide for validating a known issue or bug bounty report
-  explore      Create guide for exploring a feature or web app for security flaws
+Creates a system prompt guide (AGENT-*.md) in .sectool/ for configuring
+LLM coding agents to perform security testing.
+
+---
+
+init explore
+
+  Create guide for exploratory security testing of a feature or web app.
+  Agent will systematically probe for vulnerabilities across OWASP categories.
+
+  Example:
+    sectool init explore
+    claude --system-prompt-file .sectool/AGENT-explore.md
+
+  Creates: .sectool/AGENT-explore.md
+
+---
+
+init test-report
+
+  Create guide for validating a known issue or bug bounty report.
+  Agent will attempt to reproduce and verify a specific vulnerability.
+
+  Example:
+    sectool init test-report
+    claude --system-prompt-file .sectool/AGENT-test-report.md
+
+  Creates: .sectool/AGENT-test-report.md
+
+---
 
 Options:
 `)

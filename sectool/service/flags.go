@@ -58,14 +58,29 @@ func Parse(args []string) error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `Usage: sectool service <command> [options]
 
-Manage the sectool background service.
+Manage the sectool background service. The service auto-starts when needed;
+these commands are for debugging and manual control.
 
 Commands:
-  status     Show service status and health
-  stop       Stop the running service
-  logs       View service logs
+  status     Show service health and backend connection status
+  stop       Gracefully stop the running service
+  logs       View service logs (useful for debugging backend errors)
 
-Use "sectool service <command> --help" for more information.
+---
+
+service status
+  No options.
+
+---
+
+service stop
+  No options.
+
+---
+
+service logs [options]
+  -n, --lines <num>      number of lines to show (default: 50)
+  -f, --follow           follow log output continuously
 `)
 }
 

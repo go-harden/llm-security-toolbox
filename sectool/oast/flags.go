@@ -41,34 +41,81 @@ func Parse(args []string) error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `Usage: sectool oast <command> [options]
 
-Manage OAST (Out-of-band Application Security Testing) domains for detecting
-blind vulnerabilities (SSRF, XXE, blind SQLi, command injection, etc).
+Out-of-band Application Security Testing (OAST) for detecting blind
+vulnerabilities (SSRF, XXE, blind SQLi, command injection, etc).
 
 Workflow:
   1. Create a session to get a unique domain:
        sectool oast create
-     Returns oast_id and domain (e.g., xyz123.oast.fun)
-
-  2. Use the domain in payloads, with subdomains for tagging:
+  2. Use the domain in payloads with subdomains for tagging:
        curl https://sqli-test.xyz123.oast.fun
        nslookup xxe-probe.xyz123.oast.fun
-
-  3. Poll to see interactions (summary table):
+  3. Poll to see interactions:
        sectool oast poll <oast_id>
-       sectool oast poll <oast_id> --since last    # only new events
-
-  4. Get full details for a specific event:
+  4. Get full event details:
        sectool oast get <oast_id> <event_id>
-     Shows complete raw request/response without truncation
 
-Commands:
-  create     Create a new OAST session (returns oast_id and domain)
-  poll       Poll for interactions (returns summary table with event_ids)
-  get        Get full details for a specific event
-  list       List active OAST sessions
-  delete     Delete an OAST session
+---
 
-Use "sectool oast <command> --help" for more information.
+oast create
+
+  Create a new OAST session with unique domain.
+
+  Example:
+    sectool oast create
+
+  Output: oast_id and domain (e.g., xyz123.oast.fun)
+
+---
+
+oast poll <oast_id> [options]
+
+  Poll for out-of-band interactions (DNS, HTTP).
+
+  Examples:
+    sectool oast poll abc123                    # all events
+    sectool oast poll abc123 --since last       # only new events
+    sectool oast poll abc123 --wait 30s         # wait up to 30s for events
+
+  Options:
+    --since <id>       events after event_id, or 'last' for new events
+    --wait <dur>       max wait time for events (default: 2m, max: 2m)
+
+  Output: Markdown table with event_id, time, type, source_ip, subdomain
+
+---
+
+oast get <oast_id> <event_id>
+
+  Get full details for a specific event without truncation.
+
+  Example:
+    sectool oast poll abc123          # find event_id
+    sectool oast get abc123 evt_xyz   # get full details
+
+  Output: Complete raw request/response data
+
+---
+
+oast list
+
+  List all active OAST sessions.
+
+  Example:
+    sectool oast list
+
+  Output: Markdown table with oast_id, domain, created_at
+
+---
+
+oast delete <oast_id>
+
+  Delete an OAST session.
+
+  Example:
+    sectool oast delete abc123
+
+  Output: Confirmation message
 `)
 }
 

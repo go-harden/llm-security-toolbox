@@ -36,25 +36,51 @@ func Parse(args []string) error {
 }
 
 func printUsage() {
-	fmt.Fprint(os.Stderr, `Usage: sectool encode <type> [options] [string]
+	fmt.Fprint(os.Stderr, `Usage: sectool encode <type> [options] <string | -f PATH>
 
-Encoding/decoding utilities (runs locally, no service required).
+Encoding/decoding utilities for security testing payloads.
+Runs locally, no service required.
 
-Types:
-  url        URL percent-encoding
-  base64     Base64 encoding
-  html       HTML entity encoding
+---
 
-Options:
-  -d, --decode      Decode instead of encode
-  -f, --file PATH   Read input from file (use - for stdin)
-  --raw             Output without trailing newline
+encode url [options] <string>
 
-Examples:
-  sectool encode url "hello world"
-  sectool encode base64 "secret"
-  sectool encode base64 -d "c2VjcmV0"
-  echo -n "data" | sectool encode base64 -f -
+  URL percent-encoding for query parameters and path segments.
+
+  Examples:
+    sectool encode url "hello world"           # hello%20world
+    sectool encode url -d "hello%20world"      # hello world
+    sectool encode url "<script>alert(1)</script>"
+
+---
+
+encode base64 [options] <string>
+
+  Base64 encoding for binary data and obfuscation.
+
+  Examples:
+    sectool encode base64 "secret"             # c2VjcmV0
+    sectool encode base64 -d "c2VjcmV0"        # secret
+    sectool encode base64 -f payload.bin       # encode file contents
+
+---
+
+encode html [options] <string>
+
+  HTML entity encoding for XSS payload construction.
+
+  Examples:
+    sectool encode html "<script>"             # &lt;script&gt;
+    sectool encode html -d "&lt;script&gt;"   # <script>
+
+---
+
+Common Options (all types):
+  -d, --decode      decode instead of encode
+  -f, --file PATH   read input from file (- for stdin)
+  --raw             output without trailing newline
+
+Output: Encoded/decoded string to stdout
 `)
 }
 

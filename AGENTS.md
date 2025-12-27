@@ -177,6 +177,11 @@ All endpoints over Unix socket at `.sectool/service/socket`:
 
 ## Development Guidelines
 
+### CLI Help Text
+
+- Flatten --help details at the first subcommand level (e.g., `sectool proxy --help` shows full docs for list/export)
+- Second tier subcommand help flags also exist and must be kept in sync
+
 ### Code Style
 
 - Use `var` style for zero-value initialization: `var foo bool` not `foo := false`

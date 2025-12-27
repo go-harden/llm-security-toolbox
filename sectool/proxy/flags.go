@@ -40,13 +40,64 @@ func Parse(args []string) error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `Usage: sectool proxy <command> [options]
 
-Query and manage proxy history.
+Query and manage proxy history from Burp Suite.
 
-Commands:
-  list       List proxy history (aggregate or filtered)
-  export     Export a flow to disk for editing
+Workflow:
+  1. Browse target with Burp proxy to capture traffic
+  2. List requests to find interesting flows:
+       sectool proxy list --host example.com
+  3. Export a flow for editing (outputs bundle path):
+       sectool proxy export f7k2x
+  4. Replay with modifications:
+       sectool replay send --bundle .sectool/requests/f7k2x
 
-Use "sectool proxy <command> --help" for more information.
+---
+
+proxy list [options]
+
+  Without filters: aggregated summary grouped by host/path/method/status
+  With filters: individual flows with flow_id for export
+
+  Examples:
+    sectool proxy list                                    # aggregated summary
+    sectool proxy list --host api.example.com             # flows for host
+    sectool proxy list --host "*.example.com" --method POST,PUT
+    sectool proxy list --path "/api/*" --status 200,201
+    sectool proxy list --since last                       # new flows only
+
+  Options:
+    --host <pattern>        host glob pattern (*, ?)
+    --path <pattern>        path glob pattern (*, ?)
+    --method <list>         comma-separated methods (POST,PUT)
+    --status <list>         comma-separated status codes (200,404)
+    --contains <text>       search URL and headers
+    --contains-body <text>  search request/response body
+    --since <id>            flows after flow_id, or 'last' for new flows
+    --exclude-host <pat>    exclude matching hosts
+    --exclude-path <pat>    exclude matching paths
+
+  Output: Markdown table. With filters: flow_id, method, host, path, status, size
+
+---
+
+proxy export <flow_id>
+
+  Export a captured request to disk for editing and replay.
+
+  Examples:
+    sectool proxy list --host example.com     # find flow_id
+    sectool proxy export f7k2x                # outputs: .sectool/requests/f7k2x/
+    sectool replay send --bundle .sectool/requests/f7k2x
+
+  Creates bundle in .sectool/requests/<id>/:
+    request.http       HTTP headers with body placeholder
+    body.bin           request body (edit this for modifications)
+    request.meta.json  metadata (method, URL, timestamps)
+
+  Options:
+    --out <path>            custom output directory
+
+  Output: Bundle path and files created
 `)
 }
 

@@ -91,15 +91,17 @@ func printRootUsage() {
 
 Commands:
   init       Initialize working directory for security agent task
-  service    Manage the sectool service (status, stop, logs)
   proxy      Query and manage proxy history
-  replay     Replay HTTP requests (with validation)
+  replay     Replay HTTP requests (with modifications)
   oast       Manage OAST domains for out-of-band testing
   encode     Encoding/decoding utilities (url, base64, html)
+  service    Manage background service (user only, auto-starts as needed)
 
 Global Options:
   --timeout <dur>    Client-side timeout (default: 30s)
 
 Use "sectool <command> --help" for specific command usage.
+
+Debug unexpected errors with: sectool service logs
 `)
 }

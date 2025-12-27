@@ -35,13 +35,64 @@ func Parse(args []string) error {
 func printUsage() {
 	fmt.Fprint(os.Stderr, `Usage: sectool replay <command> [options]
 
-Replay HTTP requests through the proxy.
+Replay HTTP requests through Burp Suite proxy.
 
-Commands:
-  send       Send a request (from flow, bundle, or file)
-  get        Get details of a previous replay
+Workflow:
+  1. Simple replay from proxy history:
+       sectool replay send --flow <flow_id>
+  2. Replay with inline modifications (no file editing):
+       sectool replay send --flow <flow_id> --set-header "X-Test: value"
+  3. Or export, edit files, then replay:
+       sectool proxy export <flow_id>
+       # edit .sectool/requests/<bundle_id>/body.bin
+       sectool replay send --bundle .sectool/requests/<bundle_id>
 
-Use "sectool replay <command> --help" for more information.
+---
+
+replay send [options]
+
+  Send a request through the HTTP backend.
+
+  Input sources (exactly one required):
+    --flow <flow_id>      replay from proxy history
+    --bundle <path>       replay from exported bundle directory
+    --file <path>         replay from raw HTTP file (- for stdin)
+
+  Examples:
+    sectool replay send --flow f7k2x
+    sectool replay send --flow f7k2x --set-header "Authorization: Bearer tok"
+    sectool replay send --flow f7k2x --path /api/v2/users --set-query "id=123"
+    sectool replay send --bundle .sectool/requests/abc123
+    sectool replay send --file request.http --body payload.bin
+
+  Request modifications (combine multiple):
+    --set-header "Name: Value"     add or replace header
+    --remove-header "Name"         remove header
+    --path "/new/path"             replace URL path
+    --query "key=val&k2=v2"        replace entire query string
+    --set-query "key=value"        add or replace query param
+    --remove-query "key"           remove query param
+    --target "https://other:8443"  override destination host
+
+  Other options:
+    --follow-redirects             follow 3xx redirects
+    --request-timeout <dur>        HTTP timeout (0 = no timeout)
+    --force                        send even if validation fails
+    --body <path>                  body file (with --file)
+
+  Output: Markdown with replay_id, status, headers, body preview
+
+---
+
+replay get <replay_id>
+
+  Retrieve full details of a previous replay.
+
+  Example:
+    sectool replay send --flow f7k2x        # returns replay_id
+    sectool replay get rpl_abc123           # get full response
+
+  Output: Markdown with status, headers, and complete response body
 `)
 }
 
