@@ -164,8 +164,7 @@ type PathQueryOpts struct {
 
 // HasModifications returns true if any path/query modification is specified.
 func (o *PathQueryOpts) HasModifications() bool {
-	return o.Path != "" || o.Query != "" ||
-		len(o.SetQuery) > 0 || len(o.RemoveQuery) > 0
+	return o.Path != "" || o.Query != "" || len(o.SetQuery) > 0 || len(o.RemoveQuery) > 0
 }
 
 // parseRequestLine parses the HTTP request line into method, path, query, and version.

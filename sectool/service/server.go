@@ -103,7 +103,6 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to create requests directory: %w", err)
 	}
 
-	// Load or create config
 	if err := s.loadOrCreateConfig(); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -311,6 +310,7 @@ func (s *Server) routes() http.Handler {
 func (s *Server) RegisterHealthMetric(key string, provider HealthMetricProvider) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	s.metricProvider[key] = provider
 }
 
@@ -360,7 +360,7 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) 
 	}
 }
 
-// writeError writes an error JSON response
+// writeError writes an error JSON response.
 func (s *Server) writeError(w http.ResponseWriter, status int, code, message, hint string) {
 	if hint != "" {
 		log.Printf("error: %s - %s (%s)", code, message, hint)
@@ -375,7 +375,6 @@ func (s *Server) writeError(w http.ResponseWriter, status int, code, message, hi
 	}
 }
 
-// RequestShutdown can be called internally to trigger shutdown
 func (s *Server) RequestShutdown() {
 	select {
 	case <-s.shutdownCh:

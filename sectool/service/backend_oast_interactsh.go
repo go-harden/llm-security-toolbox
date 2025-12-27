@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	// pollCheckInterval is how often PollSession checks for new events in the local buffer
+	// pollCheckInterval is how often PollSession checks for new events in the local buffer.
 	pollCheckInterval = 100 * time.Millisecond
-	// interactshPollInterval is how often the interactsh client polls the server
-	interactshPollInterval = 2 * time.Second
-	// sessionCloseTimeout is how long to wait when closing a session
-	sessionCloseTimeout = 2 * time.Second
+	// interactshPollInterval is how often the interactsh client polls the server.
+	interactshPollInterval = 10 * time.Second
+	// sessionCloseTimeout is how long to wait when closing a session.
+	sessionCloseTimeout = 10 * time.Second
 )
 
 // InteractshBackend implements OastBackend using Interactsh.
@@ -130,8 +130,7 @@ func (b *InteractshBackend) CreateSession(ctx context.Context, label string) (*O
 
 	log.Printf("oast: created session %s with domain %s (label=%q)", sessionID, domain, label)
 
-	// Start background polling
-	go b.pollLoop(sess)
+	go b.pollLoop(sess) // Start background polling
 
 	return &sess.info, nil
 }
@@ -146,9 +145,11 @@ func (b *InteractshBackend) pollLoop(sess *oastSession) {
 			return
 		}
 
-		eventTime := time.Now()
-		if interaction.Timestamp.After(time.Time{}) {
+		var eventTime time.Time
+		if interaction.Timestamp.IsZero() {
 			eventTime = interaction.Timestamp
+		} else {
+			eventTime = time.Now()
 		}
 
 		details := make(map[string]interface{}, 4)

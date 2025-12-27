@@ -175,7 +175,6 @@ func (c *Client) checkPIDFile() (pid int, exists bool) {
 	if err != nil {
 		return 0, false
 	}
-
 	return pid, true
 }
 

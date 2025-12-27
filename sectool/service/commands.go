@@ -169,8 +169,7 @@ func followLogs(ctx context.Context, logPath string) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	_, err = file.Seek(0, io.SeekEnd) // Seek to end
-	if err != nil {
+	if _, err = file.Seek(0, io.SeekEnd); err != nil { // Seek to end
 		return fmt.Errorf("failed to seek to end of log file: %w", err)
 	}
 

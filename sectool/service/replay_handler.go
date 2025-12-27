@@ -69,16 +69,14 @@ func applyHeaderModifications(headers []byte, req *ReplaySendRequest) []byte {
 		headers = removeHeader(headers, name)
 	}
 	for _, h := range req.AddHeaders {
-		parts := strings.SplitN(h, ":", 2)
-		if len(parts) == 2 {
+		if parts := strings.SplitN(h, ":", 2); len(parts) == 2 {
 			headers = setHeader(headers, strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
 		}
 	}
 
 	// Handle --target (update Host header)
 	if req.Target != "" {
-		u, err := url.Parse(req.Target)
-		if err == nil && u.Host != "" {
+		if u, err := url.Parse(req.Target); err == nil && u.Host != "" {
 			headers = setHeader(headers, "Host", u.Host)
 		}
 	}
@@ -231,8 +229,7 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 
 	// Resolve input, tracking original body size for bundles to detect modifications
 	var rawRequest []byte
-	var bundlePath string
-	var inputSource string
+	var bundlePath, inputSource string
 	originalBodySize := -1 // -1 means not from bundle (always update Content-Length)
 	switch {
 	case req.FlowID != "":
@@ -334,7 +331,6 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 	// Determine target
 	host, port, usesHTTPS := parseTarget(rawRequest, req.Target)
 
-	// Generate replay_id
 	replayID := ids.Generate(ids.DefaultLength)
 
 	scheme := schemeHTTP

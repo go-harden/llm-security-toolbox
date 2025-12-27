@@ -53,11 +53,9 @@ func writeBundle(dir string, headers, body []byte, meta *bundleMeta) error {
 		return fmt.Errorf("failed to write body.bin: %w", err)
 	}
 
-	metaBytes, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
+	if metaBytes, err := json.MarshalIndent(meta, "", "  "); err != nil {
 		return fmt.Errorf("failed to marshal meta: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "request.meta.json"), metaBytes, 0644); err != nil {
+	} else if err := os.WriteFile(filepath.Join(dir, "request.meta.json"), metaBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write request.meta.json: %w", err)
 	}
 
