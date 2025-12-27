@@ -89,6 +89,9 @@ func send(timeout time.Duration, flow, bundle, file, body, target string, header
 
 	resp, err := client.ReplaySend(ctx, req)
 	if err != nil {
+		if bundle != "" {
+			fmt.Fprintln(os.Stderr, "\nTip: Consider using `sectool replay send --flow <flow_id>` with modification flags as a simpler alternative to editing bundle files directly.")
+		}
 		return fmt.Errorf("replay send failed: %w", err)
 	}
 
