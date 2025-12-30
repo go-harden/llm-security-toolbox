@@ -38,6 +38,24 @@ func NewServicePaths(workDir string) ServicePaths {
 	}
 }
 
+// ResolvePath resolves a path relative to WorkDir.
+// If the path is already absolute, it is returned unchanged.
+func (p *ServicePaths) ResolvePath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(p.WorkDir, path)
+}
+
+// RelPath returns the path relative to WorkDir for cleaner output.
+// If conversion fails, the original path is returned.
+func (p *ServicePaths) RelPath(path string) string {
+	if rel, err := filepath.Rel(p.WorkDir, path); err == nil {
+		return rel
+	}
+	return path
+}
+
 // APIResponse is the standard envelope for all API responses.
 type APIResponse struct {
 	OK    bool            `json:"ok"`

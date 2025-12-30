@@ -102,7 +102,7 @@ func TestBurp_ProxyExportAndReplay(t *testing.T) {
 
 	// Verify bundle files
 	assert.FileExists(t, filepath.Join(exportResp.BundlePath, "request.http"))
-	assert.FileExists(t, filepath.Join(exportResp.BundlePath, "body.bin"))
+	assert.FileExists(t, filepath.Join(exportResp.BundlePath, "body"))
 	assert.FileExists(t, filepath.Join(exportResp.BundlePath, "request.meta.json"))
 
 	// Read and log the request

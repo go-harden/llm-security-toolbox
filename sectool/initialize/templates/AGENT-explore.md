@@ -59,7 +59,7 @@ Explore different angles in parallel when appropriate. When uncertain about appl
 
 1. Capture an authenticated request
 2. Export: `{{.SectoolCmd}} proxy export <flow_id>`
-3. Edit `.sectool/requests/<bundle_id>/body.bin` to change user IDs
+3. Edit `.sectool/requests/<bundle_id>/body` to change user IDs
 4. Replay: `{{.SectoolCmd}} replay send --bundle .sectool/requests/<bundle_id>`
 5. Compare responses between different user IDs
 
@@ -95,7 +95,7 @@ If wanting to register an account, or verify an email you can use OAST.
 ### Header/Parameter Manipulation
 
 1. Export request: `{{.SectoolCmd}} proxy export <flow_id>`
-2. Modify headers in `request.http` or body in `body.bin`
+2. Modify headers in `request.http` or body in `body`
 3. Replay with modifications:
 ```bash
 {{.SectoolCmd}} replay send --bundle .sectool/requests/<bundle_id>

@@ -70,7 +70,7 @@ oast create [options]
 
 oast poll <oast_id|label|domain> [options]
 
-  Poll for out-of-band interactions (DNS, HTTP).
+  Poll for out-of-band interactions (DNS, HTTP, SMTP).
 
   Options:
     --since <id>       events after event_id, or 'last' for new events

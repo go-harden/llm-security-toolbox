@@ -63,9 +63,9 @@ func NewClient(workDir string, opts ...ClientOption) *Client {
 	return c
 }
 
-// LogPath returns the path to the service log file.
+// LogPath returns the relative path to the service log file for display.
 func (c *Client) LogPath() string {
-	return c.paths.LogFile
+	return c.paths.RelPath(c.paths.LogFile)
 }
 
 // EnsureService ensures the service is running, starting it if necessary.
@@ -223,7 +223,7 @@ func (c *Client) waitForHealthy(ctx context.Context) error {
 		time.Sleep(startupPollInterval)
 	}
 
-	return fmt.Errorf("service did not become healthy within %v (check %s)", startupTimeout, c.paths.LogFile)
+	return fmt.Errorf("service did not become healthy within %v (check %s)", startupTimeout, c.LogPath())
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*APIResponse, error) {

@@ -46,12 +46,15 @@ Workflow:
   1. Browse target with Burp proxy to capture traffic
   2. List requests to find interesting flows:
        sectool proxy list --host example.com
-  3. Export a flow for editing (outputs bundle path):
+  3a. Replay with inline modifications (preferred for most testing):
+       sectool replay send --flow f7k2x --set-json "role=admin"
+       sectool replay send --flow f7k2x --set-header "X-Test: value"
+  3b. Export for complex edits (raw body manipulation, binary data):
        sectool proxy export f7k2x
-  4. Replay with modifications:
+       # edit .sectool/requests/f7k2x/body
        sectool replay send --bundle .sectool/requests/f7k2x
 
-Run 'sectool replay --help' to see all replay options (header manipulation, target override, etc).
+Run 'sectool replay --help' to see all replay options and modification support.
 
 ---
 
@@ -86,10 +89,12 @@ proxy list [options]
 proxy export <flow_id>
 
   Export a captured request to disk for editing and replay.
+  Note: Prefer 'replay send --flow' with modification flags for simple changes.
+  Export is useful for complex edits (raw body, binary data, etc).
 
   Creates bundle in .sectool/requests/<id>/:
     request.http       HTTP headers with body placeholder
-    body.bin           request body (edit this for modifications)
+    body               request body (edit this for modifications)
     request.meta.json  metadata (method, URL, timestamps)
 
   Options:
@@ -164,20 +169,22 @@ func parseExport(args []string) error {
 		fmt.Fprint(os.Stderr, `Usage: sectool proxy export <flow_id> [options]
 
 Export a flow to disk for editing and replay.
+Note: Prefer 'replay send --flow' with modification flags for simple changes.
+Export is useful for complex edits (raw body, binary data, etc).
 
 First, find the flow_id using 'sectool proxy list' with filters:
   sectool proxy list --host example.com --path /api/*
 
 Creates a request bundle in .sectool/requests/<bundle_id>/ containing:
   request.http       HTTP headers (with body placeholder)
-  body.bin           Request body (edit directly for modifications)
+  body               Request body (edit directly for modifications)
   request.meta.json  Metadata (method, URL, timestamps)
 
 After replay, response files are added:
   response.http      Response headers
-  response.body.bin  Response body
+  response.body     Response body
 
-Edit body.bin for body modifications; Content-Length is auto-updated on replay.
+Edit body for body modifications; Content-Length is auto-updated on replay.
 
 Options:
 `)

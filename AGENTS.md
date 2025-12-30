@@ -81,10 +81,10 @@ make lint           # Run golangci-lint and go vet
 └── requests/             # Exported request bundles
     └── <bundle_id>/
         ├── request.http       # HTTP headers with body placeholder
-        ├── body.bin           # Raw request body
+        ├── body               # Raw request body
         ├── request.meta.json  # Metadata (method, URL, timestamps)
         ├── response.http      # Response headers (after replay)
-        └── response.body.bin  # Response body (after replay)
+        └── response.body      # Response body (after replay)
 ```
 
 ## Key Types

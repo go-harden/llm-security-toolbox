@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -49,7 +50,11 @@ func status(timeout time.Duration) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("Socket Path: `%s`\n", st.SocketPath)
+	socketPath := st.SocketPath
+	if rel, err := filepath.Rel(workDir, st.SocketPath); err == nil {
+		socketPath = rel
+	}
+	fmt.Printf("Socket Path: `%s`\n", socketPath)
 
 	return nil
 }
@@ -103,7 +108,11 @@ func logs(timeout time.Duration, follow bool, lines int) error {
 	client := NewClient(workDir, WithTimeout(timeout))
 	if _, err := os.Stat(client.paths.LogFile); os.IsNotExist(err) {
 		fmt.Println("No service logs found.")
-		fmt.Printf("Log file would be at: %s\n", client.paths.LogFile)
+		logPath := client.paths.LogFile
+		if rel, err := filepath.Rel(workDir, client.paths.LogFile); err == nil {
+			logPath = rel
+		}
+		fmt.Printf("Log file would be at: %s\n", logPath)
 		return nil
 	}
 

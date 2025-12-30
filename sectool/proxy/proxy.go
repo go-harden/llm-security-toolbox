@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -122,14 +123,20 @@ func export(timeout time.Duration, flowID, out string) error {
 		return fmt.Errorf("proxy export failed: %w", err)
 	}
 
+	// Convert to relative path for cleaner output
+	bundlePath := resp.BundlePath
+	if rel, err := filepath.Rel(workDir, resp.BundlePath); err == nil {
+		bundlePath = rel
+	}
+
 	// Output result
 	fmt.Printf("Exported flow `%s` to bundle `%s`\n\n", flowID, resp.BundleID)
-	fmt.Printf("Bundle path: `%s`\n\n", resp.BundlePath)
+	fmt.Printf("Bundle path: `%s`\n\n", bundlePath)
 	fmt.Println("Files created:")
 	fmt.Println("- `request.http` - HTTP headers with body placeholder")
-	fmt.Println("- `body.bin` - Request body (edit for modifications)")
+	fmt.Println("- `body` - Request body (edit for modifications)")
 	fmt.Println("- `request.meta.json` - Metadata")
-	fmt.Println("\nTo replay: `sectool replay send --bundle " + resp.BundlePath + "`")
+	fmt.Println("\nTo replay: `sectool replay send --bundle " + bundlePath + "`")
 
 	return nil
 }

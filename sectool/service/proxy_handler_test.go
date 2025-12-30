@@ -544,12 +544,12 @@ func TestHandleProxyExport(t *testing.T) {
 
 		// Verify bundle files exist
 		assert.FileExists(t, filepath.Join(exportResp.BundlePath, "request.http"))
-		assert.FileExists(t, filepath.Join(exportResp.BundlePath, "body.bin"))
+		assert.FileExists(t, filepath.Join(exportResp.BundlePath, "body"))
 		assert.FileExists(t, filepath.Join(exportResp.BundlePath, "request.meta.json"))
 	})
 
 	t.Run("body_not_corrupted", func(t *testing.T) {
-		// Regression test: verify body.bin is not corrupted by header manipulation.
+		// Regression test: verify body is not corrupted by header manipulation.
 		// Previously, splitHeadersBody returned slices sharing the same underlying array,
 		// and append() to headers could overwrite body data.
 		srv, mockMCP, cleanup := testServerWithMCP(t)
@@ -581,11 +581,11 @@ func TestHandleProxyExport(t *testing.T) {
 		var exportResp ProxyExportResponse
 		require.NoError(t, json.Unmarshal(exportAPIResp.Data, &exportResp))
 
-		// Read body.bin and verify it matches original body exactly
-		bodyPath := filepath.Join(exportResp.BundlePath, "body.bin")
+		// Read body and verify it matches original body exactly
+		bodyPath := filepath.Join(exportResp.BundlePath, "body")
 		actualBody, err := os.ReadFile(bodyPath)
 		require.NoError(t, err)
-		assert.Equal(t, bodyContent, string(actualBody), "body.bin should not be corrupted by header placeholder insertion")
+		assert.Equal(t, bodyContent, string(actualBody), "body should not be corrupted by header placeholder insertion")
 	})
 
 	t.Run("not_found", func(t *testing.T) {

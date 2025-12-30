@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const bodyPlaceholder = "[[SECTOOL_BODY_FILE: body.bin]]"
+const bodyPlaceholder = "[[SECTOOL_BODY_FILE: body]]"
 
 // bundleMeta contains metadata for a request bundle.
 type bundleMeta struct {
@@ -49,8 +49,8 @@ func writeBundle(dir string, headers, body []byte, meta *bundleMeta) error {
 		return fmt.Errorf("failed to write request.http: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, "body.bin"), body, 0644); err != nil {
-		return fmt.Errorf("failed to write body.bin: %w", err)
+	if err := os.WriteFile(filepath.Join(dir, "body"), body, 0644); err != nil {
+		return fmt.Errorf("failed to write body: %w", err)
 	}
 
 	if metaBytes, err := json.MarshalIndent(meta, "", "  "); err != nil {
@@ -79,7 +79,7 @@ func readBundle(dir string) (headers, body []byte, meta *bundleMeta, err error) 
 		return nil, nil, nil, fmt.Errorf("failed to read request: %w", err)
 	}
 
-	body, err = os.ReadFile(filepath.Join(dir, "body.bin"))
+	body, err = os.ReadFile(filepath.Join(dir, "body"))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, nil, nil, fmt.Errorf("failed to read body: %w", err)
 	}
@@ -112,8 +112,8 @@ func reconstructRequest(headers, body []byte) []byte {
 func writeResponseToBundle(dir string, respHeaders, respBody []byte) error {
 	if err := os.WriteFile(filepath.Join(dir, "response.http"), respHeaders, 0644); err != nil {
 		return fmt.Errorf("failed to write response.http: %w", err)
-	} else if err := os.WriteFile(filepath.Join(dir, "response.body.bin"), respBody, 0644); err != nil {
-		return fmt.Errorf("failed to write response.body.bin: %w", err)
+	} else if err := os.WriteFile(filepath.Join(dir, "response.body"), respBody, 0644); err != nil {
+		return fmt.Errorf("failed to write response.body: %w", err)
 	}
 	return nil
 }

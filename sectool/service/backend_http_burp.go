@@ -89,8 +89,27 @@ func (b *BurpBackend) SendRequest(ctx context.Context, name string, req SendRequ
 
 // doSendRequest performs the actual request sending.
 func (b *BurpBackend) doSendRequest(ctx context.Context, name string, req SendRequestInput) (*SendRequestResult, error) {
+	// Build descriptive tab name: sectool-domain/path [id]
+	reqPath := extractRequestPath(req.RawRequest)
+	if len(reqPath) > 8 {
+		reqPath = reqPath[:8] + ".."
+	}
+	// Extract domain+TLD only (strip subdomains)
+	domain := req.Target.Hostname
+	parts := strings.Split(domain, ".")
+	if len(parts) > 2 {
+		// Handle multi-part TLDs like co.uk: if second-to-last is short, keep 3 parts
+		if len(parts[len(parts)-2]) <= 3 {
+			domain = strings.Join(parts[len(parts)-3:], ".")
+		} else {
+			domain = strings.Join(parts[len(parts)-2:], ".")
+		}
+	}
+	id := strings.TrimPrefix(name, "sectool-")
+	tabName := fmt.Sprintf("st-%s%s [%s]", domain, reqPath, id)
+
 	err := b.client.CreateRepeaterTab(ctx, mcp.RepeaterTabParams{
-		TabName:        name,
+		TabName:        tabName,
 		Content:        string(req.RawRequest),
 		TargetHostname: req.Target.Hostname,
 		TargetPort:     req.Target.Port,

@@ -543,7 +543,7 @@ func TestHandleReplaySend(t *testing.T) {
 		require.NoError(t, os.WriteFile(headersFile, []byte(headers), 0644))
 
 		// Create separate body file
-		bodyFile := filepath.Join(tmpDir, "body.bin")
+		bodyFile := filepath.Join(tmpDir, "body")
 		body := `{"merged":"body"}`
 		require.NoError(t, os.WriteFile(bodyFile, []byte(body), 0644))
 
@@ -625,14 +625,14 @@ func TestWriteResponseToBundle(t *testing.T) {
 
 	// Verify files exist
 	assert.FileExists(t, filepath.Join(dir, "response.http"))
-	assert.FileExists(t, filepath.Join(dir, "response.body.bin"))
+	assert.FileExists(t, filepath.Join(dir, "response.body"))
 
 	// Verify content
 	headerContent, err := os.ReadFile(filepath.Join(dir, "response.http"))
 	require.NoError(t, err)
 	assert.Equal(t, respHeaders, headerContent)
 
-	bodyContent, err := os.ReadFile(filepath.Join(dir, "response.body.bin"))
+	bodyContent, err := os.ReadFile(filepath.Join(dir, "response.body"))
 	require.NoError(t, err)
 	assert.Equal(t, respBody, bodyContent)
 }

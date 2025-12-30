@@ -44,7 +44,7 @@ Workflow:
        sectool replay send --flow <flow_id> --set-header "X-Test: value"
   3. Or export, edit files, then replay:
        sectool proxy export <flow_id>
-       # edit .sectool/requests/<bundle_id>/body.bin
+       # edit .sectool/requests/<bundle_id>/body
        sectool replay send --bundle .sectool/requests/<bundle_id>
 
 ---
@@ -89,7 +89,7 @@ replay send [options]
     sectool replay send --flow f7k2x --path /api/v2/users --set-query "id=123"
     sectool replay send --flow f7k2x --set-json "user.role=admin"
     sectool replay send --bundle .sectool/requests/abc123
-    sectool replay send --file request.http --body payload.bin
+    sectool replay send --file request.http --body payload
 
   Output: Markdown with replay_id, status, headers, body preview
 

@@ -257,9 +257,9 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 
 	case req.BundlePath != "":
 		inputSource = "bundle:" + req.BundlePath
-		// Read from bundle
-		bundlePath = req.BundlePath
-		headers, body, meta, err := readBundle(req.BundlePath)
+		// Resolve path relative to working directory
+		bundlePath = s.paths.ResolvePath(req.BundlePath)
+		headers, body, meta, err := readBundle(bundlePath)
 		if err != nil {
 			s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "failed to read bundle", err.Error())
 			return
@@ -271,7 +271,9 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 
 	case req.FilePath != "":
 		inputSource = "file:" + req.FilePath
-		fileContent, err := os.ReadFile(req.FilePath)
+		// Resolve path relative to working directory
+		filePath := s.paths.ResolvePath(req.FilePath)
+		fileContent, err := os.ReadFile(filePath)
 		if err != nil {
 			s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "failed to read file", err.Error())
 			return
@@ -279,7 +281,8 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 
 		if req.BodyPath != "" {
 			// Body provided separately - merge headers from file with body from --body
-			body, err := os.ReadFile(req.BodyPath)
+			bodyPath := s.paths.ResolvePath(req.BodyPath)
+			body, err := os.ReadFile(bodyPath)
 			if err != nil {
 				s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest,
 					"failed to read body file", err.Error())

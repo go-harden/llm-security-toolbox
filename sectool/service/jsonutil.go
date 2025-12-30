@@ -25,7 +25,7 @@ func modifyJSONBody(body []byte, setJSON, removeJSON []string) ([]byte, error) {
 
 	var data interface{}
 	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("body is not valid JSON: %w (hint: export bundle and edit body.bin directly)", err)
+		return nil, fmt.Errorf("body is not valid JSON: %w (hint: export bundle and edit body directly)", err)
 	}
 
 	for _, keyPath := range removeJSON {
