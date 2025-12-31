@@ -195,7 +195,7 @@ func followLogs(ctx context.Context, logPath string) error {
 
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				// No new data, wait a bit
 				time.Sleep(100 * time.Millisecond)
 				continue

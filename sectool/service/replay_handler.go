@@ -379,17 +379,8 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 
 	respHeaders := result.Headers
 	respBody := result.Body
-
-	var status int
-	var statusLine string
-	if resp, err := readResponseBytes(respHeaders); err == nil {
-		_ = resp.Body.Close()
-		status = resp.StatusCode
-		statusLine = resp.Proto + " " + resp.Status
-	} else {
-		log.Printf("replay/send: failed to parse response headers: %v", err)
-	}
-	log.Printf("replay/send: %s completed in %v (status=%d, size=%d)", replayID, result.Duration, status, len(respBody))
+	respCode, respStatusLine := parseResponseStatus(respHeaders)
+	log.Printf("replay/send: %s completed in %v (status=%d, size=%d)", replayID, result.Duration, respCode, len(respBody))
 
 	// Store replay result for later retrieval
 	s.requestStore.Store(replayID, &store.RequestEntry{
@@ -408,8 +399,8 @@ func (s *Server) handleReplaySend(w http.ResponseWriter, r *http.Request) {
 		ReplayID: replayID,
 		Duration: result.Duration.String(),
 		ResponseDetails: ResponseDetails{
-			Status:      status,
-			StatusLine:  statusLine,
+			Status:      respCode,
+			StatusLine:  respStatusLine,
 			RespHeaders: string(respHeaders),
 			RespSize:    len(respBody),
 			RespPreview: previewBody(respBody, responsePreviewSize),
@@ -436,21 +427,13 @@ func (s *Server) handleReplayGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var status int
-	var statusLine string
-	if resp, err := readResponseBytes(result.Headers); err == nil {
-		_ = resp.Body.Close()
-		status = resp.StatusCode
-		statusLine = resp.Proto + " " + resp.Status
-	} else {
-		log.Printf("replay/get: failed to parse response headers: %v", err)
-	}
+	respCode, respStatusLine := parseResponseStatus(result.Headers)
 
 	s.writeJSON(w, http.StatusOK, ReplayGetResponse{
 		ReplayID:    req.ReplayID,
 		Duration:    result.Duration.String(),
-		Status:      status,
-		StatusLine:  statusLine,
+		Status:      respCode,
+		StatusLine:  respStatusLine,
 		RespHeaders: string(result.Headers),
 		RespBody:    base64.StdEncoding.EncodeToString(result.Body),
 		RespSize:    len(result.Body),

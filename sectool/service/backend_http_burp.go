@@ -561,15 +561,21 @@ func (b *BurpBackend) UpdateRule(ctx context.Context, idOrLabel string, input Pr
 }
 
 func (b *BurpBackend) updateRuleInSet(ctx context.Context, websocket bool, rules []mcp.MatchReplaceRule, idx int, input ProxyRuleInput, httpRules, wsRules []mcp.MatchReplaceRule) (*RuleEntry, error) {
-	id, _, _ := parseSectoolComment(rules[idx].Comment)
+	id, existingLabel, _ := parseSectoolComment(rules[idx].Comment)
 
-	if input.Label != "" {
-		if err := b.checkLabelUnique(input.Label, id, httpRules, wsRules); err != nil {
+	// Preserve existing label if none provided
+	label := input.Label
+	if label == "" {
+		label = existingLabel
+	}
+
+	if label != "" && label != existingLabel {
+		if err := b.checkLabelUnique(label, id, httpRules, wsRules); err != nil {
 			return nil, err
 		}
 	}
 
-	rules[idx].Comment = formatSectoolComment(id, input.Label)
+	rules[idx].Comment = formatSectoolComment(id, label)
 	rules[idx].RuleType = input.Type
 	rules[idx].StringMatch = input.Match
 	rules[idx].StringReplace = input.Replace
@@ -585,7 +591,7 @@ func (b *BurpBackend) updateRuleInSet(ctx context.Context, websocket bool, rules
 
 	return &RuleEntry{
 		RuleID:  id,
-		Label:   input.Label,
+		Label:   label,
 		Type:    input.Type,
 		IsRegex: input.IsRegex,
 		Match:   input.Match,

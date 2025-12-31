@@ -12,18 +12,31 @@ import (
 	"github.com/jentfoo/llm-security-toolbox/sectool/config"
 )
 
+const DefaultMCPPort = 9119
+
 type DaemonFlags struct {
 	WorkDir    string
 	BurpMCPURL string
+	MCP        bool
+	MCPPort    int
 }
 
 func ParseDaemonFlags(args []string) (DaemonFlags, error) {
 	fs := pflag.NewFlagSet("service", pflag.ContinueOnError)
 	fs.SetInterspersed(true)
-	flags := DaemonFlags{BurpMCPURL: config.DefaultBurpMCPURL}
+	flags := DaemonFlags{
+		BurpMCPURL: config.DefaultBurpMCPURL,
+		MCPPort:    DefaultMCPPort,
+	}
 
+	// serviceFlag is parsed but unused; defined so pflag accepts --service when --mcp is also passed
+	var serviceFlag bool
+	fs.BoolVar(&serviceFlag, "service", false, "")
+	_ = serviceFlag
 	fs.StringVar(&flags.WorkDir, "workdir", "", "working directory for service state")
 	fs.StringVar(&flags.BurpMCPURL, "burp-mcp-url", flags.BurpMCPURL, "Burp MCP SSE endpoint URL")
+	fs.BoolVar(&flags.MCP, "mcp", false, "enable MCP SSE server")
+	fs.IntVar(&flags.MCPPort, "mcp-port", flags.MCPPort, "MCP SSE server port")
 
 	if err := fs.Parse(args); err != nil {
 		return flags, err
@@ -71,6 +84,21 @@ Commands:
 service logs [options]
   -n, --lines <num>      number of lines to show (default: 50)
   -f, --follow           follow log output continuously
+
+---
+
+MCP Server Mode:
+
+To start the service with MCP support for Claude Code or Codex integration:
+
+  sectool --mcp [--mcp-port PORT]
+
+This starts both the CLI service and an MCP SSE server. Configuration
+instructions for Claude Code and Codex will be printed on startup.
+
+Options:
+  --mcp                  Enable MCP SSE server
+  --mcp-port PORT        MCP server port (default: 9119)
 `)
 }
 

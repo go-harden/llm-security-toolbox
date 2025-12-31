@@ -20,8 +20,8 @@ import (
 
 func main() {
 	args := os.Args[1:]
-	if len(args) > 0 && args[0] == "--service" {
-		os.Exit(runServiceMode(args[1:]))
+	if len(args) > 0 && (args[0] == "--service" || args[0] == "--mcp") {
+		os.Exit(runServiceMode(args))
 		return
 	}
 

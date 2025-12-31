@@ -359,3 +359,71 @@ func TestPathQueryOptsHasModifications(t *testing.T) {
 		})
 	}
 }
+
+func TestParseResponseStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		input          []byte
+		expectedCode   int
+		expectedStatus string
+	}{
+		{
+			name:           "http_1_1_200",
+			input:          []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>"),
+			expectedCode:   200,
+			expectedStatus: "HTTP/1.1 200 OK",
+		},
+		{
+			name:           "http_1_0_404",
+			input:          []byte("HTTP/1.0 404 Not Found\r\n\r\n"),
+			expectedCode:   404,
+			expectedStatus: "HTTP/1.0 404 Not Found",
+		},
+		{
+			name:           "http_1_1_500",
+			input:          []byte("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nerror"),
+			expectedCode:   500,
+			expectedStatus: "HTTP/1.1 500 Internal Server Error",
+		},
+		{
+			name:           "http_1_1_301_redirect",
+			input:          []byte("HTTP/1.1 301 Moved Permanently\r\nLocation: /new\r\n\r\n"),
+			expectedCode:   301,
+			expectedStatus: "HTTP/1.1 301 Moved Permanently",
+		},
+		{
+			name:           "http_1_1_204_no_content",
+			input:          []byte("HTTP/1.1 204 No Content\r\n\r\n"),
+			expectedCode:   204,
+			expectedStatus: "HTTP/1.1 204 No Content",
+		},
+		{
+			name:           "empty_input",
+			input:          []byte{},
+			expectedCode:   0,
+			expectedStatus: "",
+		},
+		{
+			name:           "malformed_response",
+			input:          []byte("not an http response"),
+			expectedCode:   0,
+			expectedStatus: "",
+		},
+		{
+			name:           "truncated_status",
+			input:          []byte("HTTP/1.1"),
+			expectedCode:   0,
+			expectedStatus: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			code, statusLine := parseResponseStatus(tc.input)
+			assert.Equal(t, tc.expectedCode, code)
+			assert.Equal(t, tc.expectedStatus, statusLine)
+		})
+	}
+}

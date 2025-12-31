@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,7 +14,7 @@ import (
 // handleOastCreate handles POST /oast/create
 func (s *Server) handleOastCreate(w http.ResponseWriter, r *http.Request) {
 	var req OastCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
 		return
 	}
@@ -140,24 +141,11 @@ func (s *Server) handleOastGet(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
-// handleOastList handles POST /oast/list
-func (s *Server) handleOastList(w http.ResponseWriter, r *http.Request) {
-	var req OastListRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
-		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
-		return
-	}
-
-	sessions, err := s.oastBackend.ListSessions(r.Context())
+// processOastList fetches and processes OAST sessions. Shared by HTTP and MCP handlers.
+func (s *Server) processOastList(ctx context.Context, limit int) (*OastListResponse, error) {
+	sessions, err := s.oastBackend.ListSessions(ctx)
 	if err != nil {
-		if IsTimeoutError(err) {
-			s.writeError(w, http.StatusGatewayTimeout, ErrCodeTimeout,
-				"OAST session list timed out", err.Error())
-		} else {
-			s.writeError(w, http.StatusInternalServerError, ErrCodeBackendError,
-				"failed to list OAST sessions", err.Error())
-		}
-		return
+		return nil, err
 	}
 
 	// Sort by creation time descending (most recent first)
@@ -165,12 +153,10 @@ func (s *Server) handleOastList(w http.ResponseWriter, r *http.Request) {
 		return sessions[i].CreatedAt.After(sessions[j].CreatedAt)
 	})
 
-	// Apply limit if set
-	if req.Limit > 0 && len(sessions) > req.Limit {
-		sessions = sessions[:req.Limit]
+	if limit > 0 && len(sessions) > limit {
+		sessions = sessions[:limit]
 	}
 
-	// Convert internal sessions to API response
 	apiSessions := make([]OastSession, len(sessions))
 	for i, sess := range sessions {
 		apiSessions[i] = OastSession{
@@ -182,9 +168,29 @@ func (s *Server) handleOastList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("oast/list: returning %d active sessions", len(apiSessions))
-	resp := OastListResponse{
-		Sessions: apiSessions,
+	return &OastListResponse{Sessions: apiSessions}, nil
+}
+
+// handleOastList handles POST /oast/list
+func (s *Server) handleOastList(w http.ResponseWriter, r *http.Request) {
+	var req OastListRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
+		return
 	}
+
+	resp, err := s.processOastList(r.Context(), req.Limit)
+	if err != nil {
+		if IsTimeoutError(err) {
+			s.writeError(w, http.StatusGatewayTimeout, ErrCodeTimeout,
+				"OAST session list timed out", err.Error())
+		} else {
+			s.writeError(w, http.StatusInternalServerError, ErrCodeBackendError,
+				"failed to list OAST sessions", err.Error())
+		}
+		return
+	}
+
 	s.writeJSON(w, http.StatusOK, resp)
 }
 

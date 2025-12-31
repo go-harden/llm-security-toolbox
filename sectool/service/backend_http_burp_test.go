@@ -195,6 +195,44 @@ func TestBurpBackendRules(t *testing.T) {
 				assert.Equal(t, "test-regex-updated", updated.Label)
 			})
 
+			t.Run("update_preserves_label", func(t *testing.T) {
+				// Add a rule with a label
+				rule, err := backend.AddRule(t.Context(), tc.websocket, ProxyRuleInput{
+					Label:   "preserved-label",
+					Type:    mcp.RuleTypeRequestHeader,
+					Replace: "X-Original: value",
+				})
+				require.NoError(t, err)
+
+				// Update the rule without providing a label (empty string)
+				updated, err := backend.UpdateRule(t.Context(), rule.RuleID, ProxyRuleInput{
+					Type:    mcp.RuleTypeRequestHeader,
+					Replace: "X-Updated: value",
+				})
+				require.NoError(t, err)
+
+				// Label should be preserved
+				assert.Equal(t, "preserved-label", updated.Label)
+				assert.Equal(t, "X-Updated: value", updated.Replace)
+
+				// Verify we can still find by label
+				rules, err := backend.ListRules(t.Context(), tc.websocket)
+				require.NoError(t, err)
+				var found bool
+				for _, r := range rules {
+					if r.RuleID == rule.RuleID {
+						assert.Equal(t, "preserved-label", r.Label)
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "rule should be found in list")
+
+				// Verify delete by label still works after update
+				err = backend.DeleteRule(t.Context(), "preserved-label")
+				require.NoError(t, err)
+			})
+
 			t.Run("update_not_found", func(t *testing.T) {
 				_, err := backend.UpdateRule(t.Context(), "nonexistent", ProxyRuleInput{
 					Type:    mcp.RuleTypeRequestHeader,

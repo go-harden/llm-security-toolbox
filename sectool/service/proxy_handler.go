@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -149,11 +150,26 @@ type flowEntry struct {
 // handleProxyList handles POST /proxy/list
 func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 	var req ProxyListRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
 		return
 	}
 
+	resp, err := s.processProxyList(r.Context(), &req)
+	if err != nil {
+		if IsTimeoutError(err) {
+			s.writeError(w, http.StatusGatewayTimeout, ErrCodeTimeout, "proxy history request timed out", err.Error())
+		} else {
+			s.writeError(w, http.StatusBadGateway, ErrCodeBackendError, "failed to fetch proxy history", err.Error())
+		}
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, resp)
+}
+
+// processProxyList fetches and filters proxy history. Shared by HTTP and MCP handlers.
+func (s *Server) processProxyList(ctx context.Context, req *ProxyListRequest) (*ProxyListResponse, error) {
 	if req.HasFilters() {
 		log.Printf("proxy/list: fetching with filters (host=%q path=%q method=%q status=%q since=%q)",
 			req.Host, req.Path, req.Method, req.Status, req.Since)
@@ -161,29 +177,17 @@ func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 		log.Printf("proxy/list: fetching aggregated summary")
 	}
 
-	ctx := r.Context()
-
-	// Fetch all entries from HttpBackend, filtering is done client-side
 	var allEntries []flowEntry
 	var offset uint32
 	for {
-		proxyEntries, fetchErr := s.httpBackend.GetProxyHistory(ctx, fetchBatchSize, offset)
-		if fetchErr != nil {
-			if IsTimeoutError(fetchErr) {
-				s.writeError(w, http.StatusGatewayTimeout, ErrCodeTimeout,
-					"proxy history request timed out", fetchErr.Error())
-			} else {
-				s.writeError(w, http.StatusBadGateway, ErrCodeBackendError,
-					"failed to fetch proxy history", fetchErr.Error())
-			}
-			return
+		proxyEntries, err := s.httpBackend.GetProxyHistory(ctx, fetchBatchSize, offset)
+		if err != nil {
+			return nil, err
 		}
-
 		if len(proxyEntries) == 0 {
 			break
 		}
 
-		// Parse entries into flowEntry format
 		for i, entry := range proxyEntries {
 			method, host, path := extractRequestMeta(entry.Request)
 			status := readResponseStatusCode([]byte(entry.Response))
@@ -202,24 +206,18 @@ func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 		}
 
 		offset += uint32(len(proxyEntries))
-
 		if len(proxyEntries) < fetchBatchSize {
-			break // Last page
+			break
 		}
 	}
 
 	lastOffset := s.proxyLastOffset.Load()
+	filtered := applyClientFilters(allEntries, req, s.flowStore, lastOffset)
 
-	// Apply client-side filters
-	filtered := applyClientFilters(allEntries, &req, s.flowStore, lastOffset)
-
-	// Apply limit if set
 	if req.Limit > 0 && len(filtered) > req.Limit {
 		filtered = filtered[:req.Limit]
 	}
 
-	// Track max offset from the filtered (and potentially limited) results
-	// This ensures --since last tracks the last returned item, not the absolute max
 	var maxOffset uint32
 	for _, e := range filtered {
 		if e.offset > maxOffset {
@@ -227,11 +225,10 @@ func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build response
+	var resp ProxyListResponse
 	if req.HasFilters() {
 		flows := make([]FlowSummary, 0, len(filtered))
 		for _, entry := range filtered {
-			// Compute hash including headers and body for stable flow identification
 			headerLines := extractHeaderLines(entry.request)
 			_, reqBody := splitHeadersBody([]byte(entry.request))
 			hash := store.ComputeFlowHashSimple(entry.method, entry.host, entry.path, headerLines, reqBody)
@@ -251,17 +248,18 @@ func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		log.Printf("proxy/list: returning %d flows (fetched %d, filtered %d)", len(flows), len(allEntries), len(allEntries)-len(filtered))
-		s.writeJSON(w, http.StatusOK, ProxyListResponse{Flows: flows})
+		resp.Flows = flows
 	} else {
-		// Return aggregates
 		agg := aggregateByTuple(filtered)
 		log.Printf("proxy/list: returning %d aggregates from %d entries", len(agg), len(filtered))
-		s.writeJSON(w, http.StatusOK, ProxyListResponse{Aggregates: agg})
+		resp.Aggregates = agg
 	}
 
 	if maxOffset > lastOffset {
 		s.proxyLastOffset.Store(maxOffset)
 	}
+
+	return &resp, nil
 }
 
 // applyClientFilters applies filters that can't be expressed in Burp regex.
@@ -402,7 +400,7 @@ func (s *Server) handleProxyExport(w http.ResponseWriter, r *http.Request) {
 // handleRuleList handles POST /proxy/rule/list
 func (s *Server) handleRuleList(w http.ResponseWriter, r *http.Request) {
 	var req RuleListRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
 		return
 	}

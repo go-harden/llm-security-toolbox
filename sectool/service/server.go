@@ -29,9 +29,14 @@ type Server struct {
 	flagBurpMCPURL string // from command-line flag (may be empty)
 	cfg            *config.Config
 
+	// MCP server settings
+	mcpEnabled bool
+	mcpPort    int
+
 	// Runtime state
 	listener   net.Listener
 	httpServer *http.Server
+	mcpServer  *mcpServer
 	lockFile   *os.File
 	started    chan struct{}
 	startedAt  time.Time
@@ -68,6 +73,8 @@ func NewServer(flags DaemonFlags) (*Server, error) {
 	s := &Server{
 		paths:          NewServicePaths(flags.WorkDir),
 		flagBurpMCPURL: flags.BurpMCPURL,
+		mcpEnabled:     flags.MCP,
+		mcpPort:        flags.MCPPort,
 		metricProvider: make(map[string]HealthMetricProvider),
 		started:        make(chan struct{}),
 		shutdownCh:     make(chan struct{}),
@@ -141,6 +148,16 @@ func (s *Server) Run(ctx context.Context) error {
 	s.oastBackend = NewInteractshBackend()
 	log.Printf("service ready, listening on %s", s.paths.SocketPath)
 
+	// Start MCP SSE server if enabled
+	if s.mcpEnabled {
+		s.mcpServer = newMCPServer(s)
+		if err := s.mcpServer.Start(s.mcpPort); err != nil {
+			return fmt.Errorf("failed to start MCP server: %w", err)
+		}
+		log.Printf("MCP SSE server listening on http://%s/sse", s.mcpServer.Addr())
+		s.printMCPConfig()
+	}
+
 	// Run server in goroutine
 	serverErr := make(chan error, 1)
 	go func() {
@@ -176,6 +193,13 @@ func (s *Server) shutdown() error {
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
+	}
+
+	// Close MCP server if running
+	if s.mcpServer != nil {
+		if err := s.mcpServer.Close(ctx); err != nil {
+			log.Printf("MCP server shutdown error: %v", err)
+		}
 	}
 
 	// Wait for any ongoing operations
@@ -429,4 +453,32 @@ func (s *Server) connectBurpMCP(ctx context.Context) error {
 	}
 	s.httpBackend = burpBackend
 	return nil
+}
+
+// printMCPConfig outputs MCP configuration instructions to stderr.
+func (s *Server) printMCPConfig() {
+	addr := s.mcpServer.Addr()
+	sseURL := fmt.Sprintf("http://%s/sse", addr)
+
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "================================================================================")
+	fmt.Fprintf(os.Stderr, "MCP SSE Endpoint: %s\n", sseURL)
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Claude Code:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintf(os.Stderr, "  claude mcp add sectool --transport sse %s\n", sseURL)
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Add to your Codex MCP configuration:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "  {")
+	fmt.Fprintln(os.Stderr, "    \"mcpServers\": {")
+	fmt.Fprintln(os.Stderr, "      \"sectool\": {")
+	fmt.Fprintln(os.Stderr, "        \"type\": \"sse\",")
+	fmt.Fprintf(os.Stderr, "        \"url\": \"%s\"\n", sseURL)
+	fmt.Fprintln(os.Stderr, "      }")
+	fmt.Fprintln(os.Stderr, "    }")
+	fmt.Fprintln(os.Stderr, "  }")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "================================================================================")
+	fmt.Fprintln(os.Stderr, "")
 }

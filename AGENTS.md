@@ -38,6 +38,7 @@ make lint           # Run golangci-lint and go vet
 | `service/proxy_handler.go` | Handles /proxy/list, /proxy/export |
 | `service/replay_handler.go` | Handles /replay/send, /replay/get |
 | `service/oast_handler.go` | Handles /oast/* endpoints |
+| `service/mcp_server.go` | MCP SSE server exposing tools for agent integration |
 | `service/httputil.go` | HTTP parsing utilities |
 | `service/bundle.go` | Request bundle file operations |
 | `service/mcp/burp.go` | SSE-based Burp Suite MCP client |
@@ -161,6 +162,50 @@ sectool encode html         # HTML entity encode/decode
 
 sectool version             # Show version
 
+## Usage Modes
+
+Sectool provides two integration modes for agents:
+
+**CLI Mode** (System Prompt + CLI):
+- Working directory scoped with state in `.sectool/`
+- Background service auto-starts, communicates via Unix socket
+- Agent operates on exported request bundles as files
+- Best for: file-based workflows, large request editing, parallel human+agent testing
+
+**MCP Mode** (MCP API):
+- System-wide foreground service with SSE transport
+- Direct tool calls, no file system interaction required
+- Shared proxy history across multiple agent sessions
+- Best for: token efficiency, common operations, multi-agent scenarios
+
+Start MCP mode:
+```bash
+sectool --mcp                    # SSE server on port 9119
+sectool --mcp --mcp-port 8080    # Custom port
+```
+
+## MCP Tools
+
+When running in MCP mode, the following tools are exposed:
+
+| Tool | Description |
+|------|-------------|
+| `proxy_list` | Query proxy history with filters (host, path, method, status, contains) |
+| `proxy_rule_list` | List proxy match/replace rules |
+| `proxy_rule_add` | Add proxy match/replace rule |
+| `proxy_rule_update` | Update existing proxy rule |
+| `proxy_rule_delete` | Delete proxy rule |
+| `replay_send` | Send request with modifications (headers, body, JSON fields, query params) |
+| `replay_get` | Retrieve full response from previous replay |
+| `oast_create` | Create OAST session for out-of-band testing |
+| `oast_poll` | Poll for OAST interaction events |
+| `oast_get` | Get full details of specific OAST event |
+| `oast_list` | List active OAST sessions |
+| `oast_delete` | Delete OAST session |
+| `encode_url` | URL encode/decode |
+| `encode_base64` | Base64 encode/decode |
+| `encode_html` | HTML entity encode/decode |
+
 ## Service HTTP API
 
 All endpoints over Unix socket at `.sectool/service/socket`:
@@ -179,6 +224,13 @@ All endpoints over Unix socket at `.sectool/service/socket`:
 | `POST /oast/delete` | Delete OAST session |
 
 ## Development Guidelines
+
+### API Parity
+
+- New features must be implemented in both CLI and MCP interfaces
+- Functionality should remain 1:1 between APIs; exceptions require justification
+- CLI commands map to MCP tools (e.g., `proxy list` → `proxy_list`, `replay send` → `replay_send`)
+- Shared logic belongs in handler/processing functions called by both interfaces
 
 ### CLI Conventions
 

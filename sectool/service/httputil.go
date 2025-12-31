@@ -111,6 +111,17 @@ func transformRequestForValidation(raw []byte) []byte {
 	return raw
 }
 
+// parseResponseStatus extracts status code and status line from response headers.
+// Returns zero values if parsing fails.
+func parseResponseStatus(headers []byte) (code int, statusLine string) {
+	resp, err := readResponseBytes(headers)
+	if err != nil {
+		return 0, ""
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, resp.Proto + " " + resp.Status
+}
+
 // readResponseStatusCode extracts the HTTP status code from raw response bytes.
 // Returns 0 if the status code cannot be extracted or is invalid.
 // Handles both \r\n and \n line endings, and validates status code range.
