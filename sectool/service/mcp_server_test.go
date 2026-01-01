@@ -155,6 +155,7 @@ func TestMCP_ListTools(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedTools := []string{
+		"proxy_summary",
 		"proxy_list",
 		"proxy_get",
 		"proxy_rule_list",
@@ -184,22 +185,35 @@ func TestMCP_ListTools(t *testing.T) {
 }
 
 // =============================================================================
-// Proxy List Tests
+// Proxy Summary Tests
 // =============================================================================
 
-func TestMCP_ProxyList(t *testing.T) {
+func TestMCP_ProxySummary(t *testing.T) {
 	_, mcpClient, cleanup := setupMCPServer(t)
 	defer cleanup()
 
-	// Query without filters - should return aggregates
-	result := callTool(t, mcpClient, "proxy_list", nil)
-	assert.False(t, result.IsError, "proxy_list should succeed")
+	// proxy_summary returns aggregates
+	result := callTool(t, mcpClient, "proxy_summary", nil)
+	assert.False(t, result.IsError, "proxy_summary should succeed")
 
 	text := extractText(t, result)
-	var resp ProxyListResponse
+	var resp ProxySummaryResponse
 	require.NoError(t, json.Unmarshal([]byte(text), &resp))
 
-	t.Logf("proxy_list: %d aggregates, %d flows", len(resp.Aggregates), len(resp.Flows))
+	t.Logf("proxy_summary: %d aggregates", len(resp.Aggregates))
+}
+
+// =============================================================================
+// Proxy List Tests
+// =============================================================================
+
+func TestMCP_ProxyListRequiresFilters(t *testing.T) {
+	_, mcpClient, cleanup := setupMCPServer(t)
+	defer cleanup()
+
+	// proxy_list without filters should error
+	result := callTool(t, mcpClient, "proxy_list", nil)
+	assert.True(t, result.IsError, "proxy_list without filters should fail")
 }
 
 func TestMCP_ProxyListWithFilters(t *testing.T) {

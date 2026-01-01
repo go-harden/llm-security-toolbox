@@ -14,12 +14,12 @@ import (
 // Integration tests that require a running Burp Suite instance.
 // These tests will skip automatically if Burp is not available.
 
-func TestBurp_ProxyList(t *testing.T) {
+func TestBurp_ProxySummary(t *testing.T) {
 	srv, cleanup := setupBurpServer(t)
 	t.Cleanup(cleanup)
 
-	// Query proxy list (may be empty or have entries depending on Burp state)
-	w := doBurpRequest(t, srv, "POST", "/proxy/list", ProxyListRequest{})
+	// Query proxy summary (may be empty or have entries depending on Burp state)
+	w := doBurpRequest(t, srv, "POST", "/proxy/summary", ProxyListRequest{})
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
@@ -27,10 +27,10 @@ func TestBurp_ProxyList(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.True(t, resp.OK, "response should be OK: %v", resp.Error)
 
-	var listResp ProxyListResponse
-	require.NoError(t, json.Unmarshal(resp.Data, &listResp))
+	var summaryResp ProxySummaryResponse
+	require.NoError(t, json.Unmarshal(resp.Data, &summaryResp))
 
-	t.Logf("Burp proxy list: %d aggregates, %d flows", len(listResp.Aggregates), len(listResp.Flows))
+	t.Logf("Burp proxy summary: %d aggregates", len(summaryResp.Aggregates))
 }
 
 func TestBurp_ProxyListWithFilters(t *testing.T) {

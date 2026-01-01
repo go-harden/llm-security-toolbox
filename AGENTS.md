@@ -35,7 +35,7 @@ make lint           # Run golangci-lint and go vet
 | `service/backend.go` | HttpBackend and OastBackend interface definitions |
 | `service/backend_http_burp.go` | Burp MCP implementation of HttpBackend |
 | `service/backend_oast_interactsh.go` | Interactsh implementation of OastBackend |
-| `service/proxy_handler.go` | Handles /proxy/list, /proxy/export |
+| `service/proxy_handler.go` | Handles /proxy/summary, /proxy/list, /proxy/export |
 | `service/replay_handler.go` | Handles /replay/send, /replay/get |
 | `service/oast_handler.go` | Handles /oast/* endpoints |
 | `service/mcp_server.go` | MCP SSE server exposing tools for agent integration |
@@ -145,7 +145,8 @@ sectool service status      # Service health and backend status
 sectool service logs        # View service logs
 sectool service stop        # Graceful shutdown
 
-sectool proxy list          # Summary or filtered captured request listing
+sectool proxy summary        # Aggregated traffic summary by host/path/method
+sectool proxy list          # List individual flows (requires filters)
 sectool proxy export        # Export flow to editable bundle on disk
 
 sectool replay send         # Send request (from flow, bundle, or file)
@@ -190,7 +191,8 @@ When running in MCP mode, the following tools are exposed:
 
 | Tool | Description |
 |------|-------------|
-| `proxy_list` | Query proxy history with filters (host, path, method, status, contains) |
+| `proxy_summary` | Aggregated traffic summary grouped by host/path/method/status |
+| `proxy_list` | Query individual flows with filters (requires at least one filter) |
 | `proxy_get` | Get full request/response for a flow (MCP alternative to CLI export, no disk I/O) |
 | `proxy_rule_list` | List proxy match/replace rules |
 | `proxy_rule_add` | Add proxy match/replace rule |
@@ -215,7 +217,8 @@ All endpoints over Unix socket at `.sectool/service/socket`:
 |----------|-------------|
 | `GET /health` | Service health, version, backend status |
 | `POST /srv/stop` | Graceful shutdown |
-| `POST /proxy/list` | Query proxy history with filters |
+| `POST /proxy/summary` | Aggregated traffic summary |
+| `POST /proxy/list` | Query individual flows (requires filters) |
 | `POST /proxy/export` | Export flow to disk bundle |
 | `POST /replay/send` | Send request, returns replay_id |
 | `POST /replay/get` | Retrieve replay result by ID |

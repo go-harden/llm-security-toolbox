@@ -12,9 +12,32 @@ import (
 // jsonPathRe matches path segments: key names or [index]
 var jsonPathRe = regexp.MustCompile(`([^.\[\]]+)|\[(\d+)\]`)
 
-// modifyJSONBody applies JSON modifications to the body.
+// modifyJSONBody applies JSON modifications to the body using string slice format.
+// This is the format used by CLI: ["key=value", "nested.key=value"]
 // Returns error if body is not valid JSON.
 func modifyJSONBody(body []byte, setJSON, removeJSON []string) ([]byte, error) {
+	if len(setJSON) == 0 && len(removeJSON) == 0 {
+		return body, nil
+	}
+
+	// Convert string slice to map for unified handling
+	setJSONMap := make(map[string]interface{})
+	for _, kv := range setJSON {
+		keyPath, valueStr, hasValue := strings.Cut(kv, "=")
+		if !hasValue {
+			setJSONMap[keyPath] = nil // no "=" means set to null
+		} else {
+			setJSONMap[keyPath] = inferJSONValue(valueStr)
+		}
+	}
+
+	return modifyJSONBodyMap(body, setJSONMap, removeJSON)
+}
+
+// modifyJSONBodyMap applies JSON modifications to the body using map format.
+// This is the format used by MCP: {"key": value, "nested.key": value}
+// Returns error if body is not valid JSON.
+func modifyJSONBodyMap(body []byte, setJSON map[string]interface{}, removeJSON []string) ([]byte, error) {
 	if len(setJSON) == 0 && len(removeJSON) == 0 {
 		return body, nil
 	}
@@ -31,29 +54,22 @@ func modifyJSONBody(body []byte, setJSON, removeJSON []string) ([]byte, error) {
 	for _, keyPath := range removeJSON {
 		segments, err := parseJSONPath(keyPath)
 		if err != nil {
-			return nil, fmt.Errorf("--remove-json %q: %w", keyPath, err)
+			return nil, fmt.Errorf("remove_json %q: %w", keyPath, err)
 		}
 		data, err = removeKeyAtPath(data, segments)
 		if err != nil {
-			return nil, fmt.Errorf("--remove-json %q: %w", keyPath, err)
+			return nil, fmt.Errorf("remove_json %q: %w", keyPath, err)
 		}
 	}
 
-	for _, kv := range setJSON {
-		keyPath, valueStr, hasValue := strings.Cut(kv, "=")
-		var value interface{}
-		if !hasValue {
-			value = nil // no "=" means set to null
-		} else {
-			value = inferJSONValue(valueStr)
-		}
+	for keyPath, value := range setJSON {
 		segments, err := parseJSONPath(keyPath)
 		if err != nil {
-			return nil, fmt.Errorf("--set-json %q: %w", keyPath, err)
+			return nil, fmt.Errorf("set_json %q: %w", keyPath, err)
 		}
 		data, err = setValueAtPath(data, segments, value)
 		if err != nil {
-			return nil, fmt.Errorf("--set-json %q: %w", keyPath, err)
+			return nil, fmt.Errorf("set_json %q: %w", keyPath, err)
 		}
 	}
 

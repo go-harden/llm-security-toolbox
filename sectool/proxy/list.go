@@ -9,6 +9,43 @@ import (
 	"github.com/jentfoo/llm-security-toolbox/sectool/service"
 )
 
+func summary(timeout time.Duration, host, path, method, status, contains, containsBody, excludeHost, excludePath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	workDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	client := service.NewClient(workDir, service.WithTimeout(timeout))
+	if err := client.EnsureService(ctx); err != nil {
+		return fmt.Errorf("failed to start service: %w (check %s)", err, client.LogPath())
+	}
+
+	resp, err := client.ProxySummary(ctx, &service.ProxyListRequest{
+		Host:         host,
+		Path:         path,
+		Method:       method,
+		Status:       status,
+		Contains:     contains,
+		ContainsBody: containsBody,
+		ExcludeHost:  excludeHost,
+		ExcludePath:  excludePath,
+	})
+	if err != nil {
+		return fmt.Errorf("proxy summary failed: %w", err)
+	}
+
+	if len(resp.Aggregates) > 0 {
+		printAggregateTable(resp.Aggregates)
+	} else {
+		fmt.Println("No matching entries found.")
+	}
+
+	return nil
+}
+
 func list(timeout time.Duration, host, path, method, status, contains, containsBody, since, excludeHost, excludePath string, limit int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -39,10 +76,7 @@ func list(timeout time.Duration, host, path, method, status, contains, containsB
 		return fmt.Errorf("proxy list failed: %w", err)
 	}
 
-	// Format output as markdown
-	if len(resp.Aggregates) > 0 {
-		printAggregateTable(resp.Aggregates)
-	} else if len(resp.Flows) > 0 {
+	if len(resp.Flows) > 0 {
 		printFlowTable(resp.Flows)
 	} else {
 		fmt.Println("No matching entries found.")

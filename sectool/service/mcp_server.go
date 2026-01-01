@@ -89,6 +89,7 @@ func (m *mcpServer) Close(ctx context.Context) error {
 // registerTools registers all MCP tools.
 func (m *mcpServer) registerTools() {
 	// Proxy tools
+	m.server.AddTool(m.proxySummaryTool(), m.handleProxySummary)
 	m.server.AddTool(m.proxyListTool(), m.handleProxyList)
 	m.server.AddTool(m.proxyGetTool(), m.handleProxyGet)
 	m.server.AddTool(m.proxyRuleListTool(), m.handleProxyRuleList)
@@ -113,13 +114,32 @@ func (m *mcpServer) registerTools() {
 	m.server.AddTool(m.encodeHTMLTool(), m.handleEncodeHTML)
 }
 
+func (m *mcpServer) proxySummaryTool() mcp.Tool {
+	return mcp.NewTool("proxy_summary",
+		mcp.WithDescription(`Get aggregated summary of Burp proxy history.
+
+Returns traffic grouped by (host, path, method, status), sorted by count descending.
+Use this first to understand available traffic before using proxy_list with specific filters.
+
+Filters narrow the summary scope: host/path/exclude_host/exclude_path use glob (*, ?).
+method/status are comma-separated. contains searches URL+headers; contains_body searches bodies.`),
+		mcp.WithString("host", mcp.Description("Filter by host (glob pattern, e.g., '*.example.com')")),
+		mcp.WithString("path", mcp.Description("Filter by path (glob pattern, e.g., '/api/*')")),
+		mcp.WithString("method", mcp.Description("Filter by HTTP method(s), comma-separated (e.g., 'GET,POST')")),
+		mcp.WithString("status", mcp.Description("Filter by status code(s), comma-separated (e.g., '200,302')")),
+		mcp.WithString("contains", mcp.Description("Filter by text in URL or headers (does not search body)")),
+		mcp.WithString("contains_body", mcp.Description("Filter by text in request or response body")),
+		mcp.WithString("exclude_host", mcp.Description("Exclude hosts matching glob pattern")),
+		mcp.WithString("exclude_path", mcp.Description("Exclude paths matching glob pattern")),
+	)
+}
+
 func (m *mcpServer) proxyListTool() mcp.Tool {
 	return mcp.NewTool("proxy_list",
-		mcp.WithDescription(`Query Burp proxy history.
+		mcp.WithDescription(`Query Burp proxy history for individual flows.
 
-Modes:
-- Summary (default, no filters): aggregates by (host,path,method,status), sorted by count desc
-- Flow (any filter or limit set): returns individual flows with flow_id for replay_send
+Returns individual flows with flow_id for use with proxy_get or replay_send.
+At least one filter or limit is REQUIRED. Use proxy_summary first to understand available traffic.
 
 Filters: host/path/exclude_host/exclude_path use glob (*, ?). method/status are comma-separated.
 Search: contains searches URL+headers; contains_body searches bodies.
@@ -133,7 +153,7 @@ Incremental: since=flow_id or "last" for new entries only.`),
 		mcp.WithString("since", mcp.Description("Only entries after this flow_id (exclusive), or 'last' for new entries (server remembers last position)")),
 		mcp.WithString("exclude_host", mcp.Description("Exclude hosts matching glob pattern")),
 		mcp.WithString("exclude_path", mcp.Description("Exclude paths matching glob pattern")),
-		mcp.WithNumber("limit", mcp.Description("Max results (setting this switches to flow mode)")),
+		mcp.WithNumber("limit", mcp.Description("Max results to return")),
 	)
 }
 
@@ -149,8 +169,8 @@ Use flow_id from proxy_list to identify the entry.`),
 
 func (m *mcpServer) proxyRuleListTool() mcp.Tool {
 	return mcp.NewTool("proxy_rule_list",
-		mcp.WithDescription("List Burp proxy match/replace rules (HTTP by default; websocket=true for WS)."),
-		mcp.WithBoolean("websocket", mcp.Description("List WebSocket rules instead of HTTP rules")),
+		mcp.WithDescription("List Burp proxy match/replace rules. Use type_filter to control which rules are returned."),
+		mcp.WithString("type_filter", mcp.Description("Filter by rule type: 'http', 'websocket', or 'all' (default: 'all')")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of rules to return")),
 	)
 }
@@ -212,7 +232,8 @@ Edits:
 - body: replace entire body
 - set_json/remove_json: selective JSON edits; requires body to be valid JSON
 
-JSON paths: dot notation (user.email, items[0].id). Format: "path=value".
+JSON paths: dot notation (user.email, items[0].id).
+set_json is an object: {"user.email": "x", "items[0].id": 5}
 Types auto-parsed: null/true/false/numbers/{}/[], else string.
 Processing: remove_* then set_*. Content-Length/Host auto-updated.
 Validation: fix issues or use force=true for protocol testing.`),
@@ -225,7 +246,7 @@ Validation: fix issues or use force=true for protocol testing.`),
 		mcp.WithString("query", mcp.Description("Override entire query string (no leading '?')")),
 		mcp.WithArray("set_query", mcp.Items(map[string]interface{}{"type": "string"}), mcp.Description("Query params to set (format: 'name=value')")),
 		mcp.WithArray("remove_query", mcp.Items(map[string]interface{}{"type": "string"}), mcp.Description("Query param names to remove")),
-		mcp.WithArray("set_json", mcp.Items(map[string]interface{}{"type": "string"}), mcp.Description("JSON fields to set (dot path: 'user.email=x', 'items[0].id=5')")),
+		mcp.WithObject("set_json", mcp.Description("JSON fields to set as object: {\"path\": value} (e.g., {\"user.email\": \"x\", \"items[0].id\": 5})")),
 		mcp.WithArray("remove_json", mcp.Items(map[string]interface{}{"type": "string"}), mcp.Description("JSON fields to remove (dot path: 'user.temp', 'items[2]')")),
 		mcp.WithBoolean("follow_redirects", mcp.Description("Follow HTTP redirects (default: false)")),
 		mcp.WithString("timeout", mcp.Description("Request timeout (e.g., '30s', '1m')")),
@@ -317,6 +338,26 @@ func (m *mcpServer) encodeHTMLTool() mcp.Tool {
 	)
 }
 
+func (m *mcpServer) handleProxySummary(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	listReq := &ProxyListRequest{
+		Host:         req.GetString("host", ""),
+		Path:         req.GetString("path", ""),
+		Method:       req.GetString("method", ""),
+		Status:       req.GetString("status", ""),
+		Contains:     req.GetString("contains", ""),
+		ContainsBody: req.GetString("contains_body", ""),
+		ExcludeHost:  req.GetString("exclude_host", ""),
+		ExcludePath:  req.GetString("exclude_path", ""),
+	}
+
+	resp, err := m.service.processProxySummary(ctx, listReq)
+	if err != nil {
+		return errorResult("failed to fetch proxy summary: " + err.Error()), nil
+	}
+
+	return jsonResult(resp)
+}
+
 func (m *mcpServer) handleProxyList(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	listReq := &ProxyListRequest{
 		Host:         req.GetString("host", ""),
@@ -329,6 +370,10 @@ func (m *mcpServer) handleProxyList(ctx context.Context, req mcp.CallToolRequest
 		ExcludeHost:  req.GetString("exclude_host", ""),
 		ExcludePath:  req.GetString("exclude_path", ""),
 		Limit:        req.GetInt("limit", 0),
+	}
+
+	if !listReq.HasFilters() {
+		return errorResult("at least one filter or limit is required; use proxy_summary first to see available traffic"), nil
 	}
 
 	resp, err := m.service.processProxyList(ctx, listReq)
@@ -387,19 +432,42 @@ func (m *mcpServer) handleProxyGet(ctx context.Context, req mcp.CallToolRequest)
 }
 
 func (m *mcpServer) handleProxyRuleList(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	websocket := req.GetBool("websocket", false)
+	typeFilter := req.GetString("type_filter", "all")
 	limit := req.GetInt("limit", 0)
 
-	rules, err := m.service.httpBackend.ListRules(ctx, websocket)
-	if err != nil {
-		return errorResult("failed to list rules: " + err.Error()), nil
+	var rules []RuleEntry
+	switch typeFilter {
+	case "http":
+		httpRules, err := m.service.httpBackend.ListRules(ctx, false)
+		if err != nil {
+			return errorResult("failed to list HTTP rules: " + err.Error()), nil
+		}
+		rules = httpRules
+	case "websocket":
+		wsRules, err := m.service.httpBackend.ListRules(ctx, true)
+		if err != nil {
+			return errorResult("failed to list WebSocket rules: " + err.Error()), nil
+		}
+		rules = wsRules
+	case "all", "":
+		httpRules, err := m.service.httpBackend.ListRules(ctx, false)
+		if err != nil {
+			return errorResult("failed to list HTTP rules: " + err.Error()), nil
+		}
+		wsRules, err := m.service.httpBackend.ListRules(ctx, true)
+		if err != nil {
+			return errorResult("failed to list WebSocket rules: " + err.Error()), nil
+		}
+		rules = append(httpRules, wsRules...)
+	default:
+		return errorResult("invalid type_filter: must be 'http', 'websocket', or 'all'"), nil
 	}
 
 	if limit > 0 && len(rules) > limit {
 		rules = rules[:limit]
 	}
 
-	log.Printf("mcp/proxy_rule_list: returning %d rules", len(rules))
+	log.Printf("mcp/proxy_rule_list: returning %d rules (filter=%s)", len(rules), typeFilter)
 	return jsonResult(RuleListResponse{Rules: rules})
 }
 
@@ -536,10 +604,18 @@ func (m *mcpServer) handleReplaySend(ctx context.Context, req mcp.CallToolReques
 		reqBody = []byte(body)
 	}
 
-	setJSON := req.GetStringSlice("set_json", nil)
+	// Get set_json as a map (MCP format: {"path": value})
+	var setJSON map[string]interface{}
+	if args := req.GetArguments(); args != nil {
+		if setJSONRaw, ok := args["set_json"]; ok && setJSONRaw != nil {
+			if setJSONMap, ok := setJSONRaw.(map[string]interface{}); ok {
+				setJSON = setJSONMap
+			}
+		}
+	}
 	removeJSON := req.GetStringSlice("remove_json", nil)
 	if len(setJSON) > 0 || len(removeJSON) > 0 {
-		modifiedBody, err := modifyJSONBody(reqBody, setJSON, removeJSON)
+		modifiedBody, err := modifyJSONBodyMap(reqBody, setJSON, removeJSON)
 		if err != nil {
 			return errorResult("JSON body modification failed: " + err.Error()), nil
 		}

@@ -182,12 +182,15 @@ func (r *ProxyListRequest) HasFilters() bool {
 		r.ExcludeHost != "" || r.ExcludePath != "" || r.Limit > 0
 }
 
+// ProxySummaryResponse is the response for proxy_summary (aggregated view).
+type ProxySummaryResponse struct {
+	Aggregates []AggregateEntry `json:"aggregates"`
+}
+
 // ProxyListResponse is the response for POST /proxy/list.
-// When no filters are applied, Aggregates is populated.
-// When filters are applied, Flows is populated.
+// Returns individual flows with flow_id for further operations.
 type ProxyListResponse struct {
-	Aggregates []AggregateEntry `json:"aggregates,omitempty"`
-	Flows      []FlowSummary    `json:"flows,omitempty"`
+	Flows []FlowSummary `json:"flows"`
 }
 
 // AggregateEntry represents a grouped count of traffic by (host, path, method, status).

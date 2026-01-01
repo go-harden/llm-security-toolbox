@@ -11,7 +11,7 @@ import (
 	"github.com/jentfoo/llm-security-toolbox/sectool/cli"
 )
 
-var proxySubcommands = []string{"list", "export", "rule", "help"} // TODO - "intercept" planned
+var proxySubcommands = []string{"summary", "list", "export", "rule", "help"} // TODO - "intercept" planned
 
 func Parse(args []string) error {
 	if len(args) < 1 {
@@ -20,6 +20,8 @@ func Parse(args []string) error {
 	}
 
 	switch args[0] {
+	case "summary":
+		return parseSummary(args[1:])
 	case "list":
 		return parseList(args[1:])
 	case "export":
@@ -43,12 +45,14 @@ Query and manage proxy history from Burp Suite.
 
 Workflow:
   1. Browse target with Burp proxy to capture traffic
-  2. List requests to find interesting flows:
-       sectool proxy list --host example.com
-  3a. Replay with inline modifications (preferred for most testing):
+  2. Get summary to understand available traffic:
+       sectool proxy summary
+  3. List specific requests to find flow_ids:
+       sectool proxy list --host example.com --limit 20
+  4a. Replay with inline modifications (preferred for most testing):
        sectool replay send --flow f7k2x --set-json "role=admin"
        sectool replay send --flow f7k2x --set-header "X-Test: value"
-  3b. Export for complex edits (raw body manipulation, binary data):
+  4b. Export for complex edits (raw body manipulation, binary data):
        sectool proxy export f7k2x
        # edit .sectool/requests/f7k2x/body
        sectool replay send --bundle .sectool/requests/f7k2x
@@ -57,10 +61,34 @@ Run 'sectool replay --help' to see all replay options and modification support.
 
 ---
 
+proxy summary [options]
+
+  Get aggregated summary of proxy history grouped by host/path/method/status.
+  Use this first to understand available traffic before using proxy list.
+
+  Options:
+    --host <pattern>        host glob pattern (*, ?)
+    --path <pattern>        path glob pattern (*, ?)
+    --method <list>         comma-separated methods (POST,PUT)
+    --status <list>         comma-separated status codes (200,404)
+    --contains <text>       search URL and headers
+    --contains-body <text>  search request/response body
+    --exclude-host <pat>    exclude matching hosts
+    --exclude-path <pat>    exclude matching paths
+
+  Examples:
+    sectool proxy summary                                 # full summary
+    sectool proxy summary --host api.example.com          # summary for host
+    sectool proxy summary --exclude-host "*.google.com"   # filter out noise
+
+  Output: Markdown table with host, path, method, status, count
+
+---
+
 proxy list [options]
 
-  Without filters: aggregated summary grouped by host/path/method/status
-  With filters: individual flows with flow_id for export
+  List individual flows with flow_id for export or replay.
+  At least one filter or --limit is REQUIRED. Use 'proxy summary' first.
 
   Options:
     --host <pattern>        host glob pattern (*, ?)
@@ -75,13 +103,12 @@ proxy list [options]
     --limit <n>             maximum number of flows to return
 
   Examples:
-    sectool proxy list                                    # aggregated summary
     sectool proxy list --host api.example.com             # flows for host
     sectool proxy list --host "*.example.com" --method POST,PUT
     sectool proxy list --path "/api/*" --status 200,201
     sectool proxy list --since last --limit 10            # new flows only, at most 10 results
 
-  Output: Markdown table. With filters: flow_id, method, host, path, status, size
+  Output: Markdown table with flow_id, method, host, path, status, size
 
 ---
 
@@ -174,6 +201,45 @@ proxy rule delete <rule_id>
 `)
 }
 
+func parseSummary(args []string) error {
+	fs := pflag.NewFlagSet("proxy summary", pflag.ContinueOnError)
+	fs.SetInterspersed(true)
+	var timeout time.Duration
+	var host, path, method, status, contains, containsBody, excludeHost, excludePath string
+
+	fs.DurationVar(&timeout, "timeout", 30*time.Second, "client-side timeout")
+	fs.StringVar(&host, "host", "", "filter by host pattern (glob: *, ?)")
+	fs.StringVar(&path, "path", "", "filter by path pattern (glob: *, ?)")
+	fs.StringVar(&method, "method", "", "filter by HTTP method (comma-separated)")
+	fs.StringVar(&status, "status", "", "filter by status code (comma-separated)")
+	fs.StringVar(&contains, "contains", "", "search in URL and headers")
+	fs.StringVar(&containsBody, "contains-body", "", "search in request/response body")
+	fs.StringVar(&excludeHost, "exclude-host", "", "exclude hosts matching pattern")
+	fs.StringVar(&excludePath, "exclude-path", "", "exclude paths matching pattern")
+
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, `Usage: sectool proxy summary [options]
+
+Get aggregated summary of proxy history grouped by host/path/method/status.
+Use this first to understand available traffic before using proxy list.
+
+Filter examples:
+  --host api.example.com          Exact host match
+  --host "*.example.com"          Glob pattern (subdomains)
+  --exclude-host "*.google.com"   Filter out noise
+
+Options:
+`)
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	return summary(timeout, host, path, method, status, contains, containsBody, excludeHost, excludePath)
+}
+
 func parseList(args []string) error {
 	fs := pflag.NewFlagSet("proxy list", pflag.ContinueOnError)
 	fs.SetInterspersed(true)
@@ -198,8 +264,8 @@ func parseList(args []string) error {
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage: sectool proxy list [options]
 
-List proxy history entries. Without filters shows aggregated view; with filters
-shows individual flows with flow_ids for export.
+List individual flows with flow_id for export or replay.
+At least one filter or --limit is REQUIRED. Use 'proxy summary' first.
 
 Filter examples:
   --host api.example.com          Exact host match
@@ -216,6 +282,15 @@ Options:
 
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	// Require at least one filter or limit
+	hasFilters := host != "" || path != "" || method != "" || status != "" ||
+		contains != "" || containsBody != "" || since != "" ||
+		excludeHost != "" || excludePath != "" || limit > 0
+	if !hasFilters {
+		fs.Usage()
+		return errors.New("at least one filter or --limit is required; use 'sectool proxy summary' first to see available traffic")
 	}
 
 	return list(timeout, host, path, method, status, contains, containsBody, since, excludeHost, excludePath, limit)

@@ -314,6 +314,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("POST /srv/stop", s.handleStop)
 
+	mux.HandleFunc("POST /proxy/summary", s.handleProxySummary)
 	mux.HandleFunc("POST /proxy/list", s.handleProxyList)
 	mux.HandleFunc("POST /proxy/export", s.handleProxyExport)
 

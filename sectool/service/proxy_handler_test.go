@@ -166,13 +166,13 @@ func TestAggregateByTuple(t *testing.T) {
 	assert.Equal(t, 200, result[0].Status)
 }
 
-func TestHandleProxyList(t *testing.T) {
+func TestHandleProxySummary(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty", func(t *testing.T) {
 		srv, _ := testServerWithMCP(t)
 
-		w := doRequest(t, srv, "POST", "/proxy/list", ProxyListRequest{})
+		w := doRequest(t, srv, "POST", "/proxy/summary", ProxyListRequest{})
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -180,10 +180,9 @@ func TestHandleProxyList(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.True(t, resp.OK)
 
-		var listResp ProxyListResponse
-		require.NoError(t, json.Unmarshal(resp.Data, &listResp))
-		assert.Empty(t, listResp.Aggregates)
-		assert.Empty(t, listResp.Flows)
+		var summaryResp ProxySummaryResponse
+		require.NoError(t, json.Unmarshal(resp.Data, &summaryResp))
+		assert.Empty(t, summaryResp.Aggregates)
 	})
 
 	t.Run("aggregate", func(t *testing.T) {
@@ -197,7 +196,7 @@ func TestHandleProxyList(t *testing.T) {
 			MakeProxyEntry("GET", "/other", "other.com", 404, "not found"),
 		)
 
-		w := doRequest(t, srv, "POST", "/proxy/list", ProxyListRequest{})
+		w := doRequest(t, srv, "POST", "/proxy/summary", ProxyListRequest{})
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -205,17 +204,33 @@ func TestHandleProxyList(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.True(t, resp.OK)
 
-		var listResp ProxyListResponse
-		require.NoError(t, json.Unmarshal(resp.Data, &listResp))
+		var summaryResp ProxySummaryResponse
+		require.NoError(t, json.Unmarshal(resp.Data, &summaryResp))
 
-		// Should have aggregates (no filters = aggregate mode)
-		assert.NotEmpty(t, listResp.Aggregates)
-		assert.Empty(t, listResp.Flows)
+		// Should have aggregates
+		assert.NotEmpty(t, summaryResp.Aggregates)
 
 		// First entry should have highest count
-		assert.Equal(t, 2, listResp.Aggregates[0].Count)
-		assert.Equal(t, "GET", listResp.Aggregates[0].Method)
-		assert.Equal(t, "example.com", listResp.Aggregates[0].Host)
+		assert.Equal(t, 2, summaryResp.Aggregates[0].Count)
+		assert.Equal(t, "GET", summaryResp.Aggregates[0].Method)
+		assert.Equal(t, "example.com", summaryResp.Aggregates[0].Host)
+	})
+}
+
+func TestHandleProxyList(t *testing.T) {
+	t.Parallel()
+
+	t.Run("requires_filters", func(t *testing.T) {
+		srv, _ := testServerWithMCP(t)
+
+		w := doRequest(t, srv, "POST", "/proxy/list", ProxyListRequest{})
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp APIResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.False(t, resp.OK)
+		assert.Contains(t, resp.Error.Message, "filter")
 	})
 
 	t.Run("filters", func(t *testing.T) {
@@ -239,8 +254,7 @@ func TestHandleProxyList(t *testing.T) {
 		var listResp ProxyListResponse
 		require.NoError(t, json.Unmarshal(resp.Data, &listResp))
 
-		// Should have flows (filters = flow mode)
-		assert.Empty(t, listResp.Aggregates)
+		// Should have flows
 		assert.NotEmpty(t, listResp.Flows)
 
 		// All flows should be GET
@@ -329,7 +343,7 @@ func TestHandleProxyList(t *testing.T) {
 		assert.Len(t, listResp.Flows, 3)
 	})
 
-	t.Run("limit_triggers_flow_mode", func(t *testing.T) {
+	t.Run("limit_is_filter", func(t *testing.T) {
 		srv, mockMCP := testServerWithMCP(t)
 
 		mockMCP.AddProxyEntries(
@@ -337,7 +351,7 @@ func TestHandleProxyList(t *testing.T) {
 			MakeProxyEntry("GET", "/api/1", "example.com", 200, "ok"),
 		)
 
-		// Limit without other filters should trigger flow mode
+		// Limit alone should be valid filter
 		w := doRequest(t, srv, "POST", "/proxy/list", ProxyListRequest{Limit: 10})
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -348,9 +362,8 @@ func TestHandleProxyList(t *testing.T) {
 		var listResp ProxyListResponse
 		require.NoError(t, json.Unmarshal(resp.Data, &listResp))
 
-		// Should have flows (not aggregates) when limit is set
+		// Should have flows when limit is set
 		assert.NotEmpty(t, listResp.Flows)
-		assert.Empty(t, listResp.Aggregates)
 	})
 
 	t.Run("since_last_with_limit", func(t *testing.T) {

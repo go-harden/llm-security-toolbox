@@ -149,11 +149,39 @@ type flowEntry struct {
 	response string
 }
 
+// handleProxySummary handles POST /proxy/summary
+func (s *Server) handleProxySummary(w http.ResponseWriter, r *http.Request) {
+	var req ProxyListRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
+		return
+	}
+
+	resp, err := s.processProxySummary(r.Context(), &req)
+	if err != nil {
+		if IsTimeoutError(err) {
+			s.writeError(w, http.StatusGatewayTimeout, ErrCodeTimeout, "proxy summary request timed out", err.Error())
+		} else {
+			s.writeError(w, http.StatusBadGateway, ErrCodeBackendError, "failed to fetch proxy summary", err.Error())
+		}
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, resp)
+}
+
 // handleProxyList handles POST /proxy/list
 func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 	var req ProxyListRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body", err.Error())
+		return
+	}
+
+	if !req.HasFilters() {
+		s.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest,
+			"at least one filter or limit is required",
+			"use 'sectool proxy summary' first to see available traffic")
 		return
 	}
 
@@ -170,15 +198,25 @@ func (s *Server) handleProxyList(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, resp)
 }
 
-// processProxyList fetches and filters proxy history. Shared by HTTP and MCP handlers.
-func (s *Server) processProxyList(ctx context.Context, req *ProxyListRequest) (*ProxyListResponse, error) {
-	if req.HasFilters() {
-		log.Printf("proxy/list: fetching with filters (host=%q path=%q method=%q status=%q since=%q)",
-			req.Host, req.Path, req.Method, req.Status, req.Since)
-	} else {
-		log.Printf("proxy/list: fetching aggregated summary")
+// processProxySummary fetches and filters proxy history, returning only aggregates.
+func (s *Server) processProxySummary(ctx context.Context, req *ProxyListRequest) (*ProxySummaryResponse, error) {
+	log.Printf("proxy/summary: fetching aggregated summary")
+
+	allEntries, err := s.fetchAllProxyEntries(ctx)
+	if err != nil {
+		return nil, err
 	}
 
+	filtered := applyClientFilters(allEntries, req, s.flowStore, s.proxyLastOffset.Load())
+
+	agg := aggregateByTuple(filtered)
+	log.Printf("proxy/summary: returning %d aggregates from %d entries", len(agg), len(filtered))
+
+	return &ProxySummaryResponse{Aggregates: agg}, nil
+}
+
+// fetchAllProxyEntries retrieves all proxy history entries from the backend.
+func (s *Server) fetchAllProxyEntries(ctx context.Context) ([]flowEntry, error) {
 	var allEntries []flowEntry
 	var offset uint32
 	for {
@@ -212,6 +250,18 @@ func (s *Server) processProxyList(ctx context.Context, req *ProxyListRequest) (*
 			break
 		}
 	}
+	return allEntries, nil
+}
+
+// processProxyList fetches and filters proxy history, returning individual flows.
+func (s *Server) processProxyList(ctx context.Context, req *ProxyListRequest) (*ProxyListResponse, error) {
+	log.Printf("proxy/list: fetching with filters (host=%q path=%q method=%q status=%q since=%q)",
+		req.Host, req.Path, req.Method, req.Status, req.Since)
+
+	allEntries, err := s.fetchAllProxyEntries(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	lastOffset := s.proxyLastOffset.Load()
 	filtered := applyClientFilters(allEntries, req, s.flowStore, lastOffset)
@@ -227,41 +277,33 @@ func (s *Server) processProxyList(ctx context.Context, req *ProxyListRequest) (*
 		}
 	}
 
-	var resp ProxyListResponse
-	if req.HasFilters() {
-		flows := make([]FlowSummary, 0, len(filtered))
-		for _, entry := range filtered {
-			headerLines := extractHeaderLines(entry.request)
-			_, reqBody := splitHeadersBody([]byte(entry.request))
-			hash := store.ComputeFlowHashSimple(entry.method, entry.host, entry.path, headerLines, reqBody)
-			flowID := s.flowStore.Register(entry.offset, hash)
+	flows := make([]FlowSummary, 0, len(filtered))
+	for _, entry := range filtered {
+		headerLines := extractHeaderLines(entry.request)
+		_, reqBody := splitHeadersBody([]byte(entry.request))
+		hash := store.ComputeFlowHashSimple(entry.method, entry.host, entry.path, headerLines, reqBody)
+		flowID := s.flowStore.Register(entry.offset, hash)
 
-			scheme, port, _ := inferSchemeAndPort(entry.host)
+		scheme, port, _ := inferSchemeAndPort(entry.host)
 
-			flows = append(flows, FlowSummary{
-				FlowID:         flowID,
-				Method:         entry.method,
-				Scheme:         scheme,
-				Host:           entry.host,
-				Port:           port,
-				Path:           truncatePath(entry.path, maxPathLength),
-				Status:         entry.status,
-				ResponseLength: entry.respLen,
-			})
-		}
-		log.Printf("proxy/list: returning %d flows (fetched %d, filtered %d)", len(flows), len(allEntries), len(allEntries)-len(filtered))
-		resp.Flows = flows
-	} else {
-		agg := aggregateByTuple(filtered)
-		log.Printf("proxy/list: returning %d aggregates from %d entries", len(agg), len(filtered))
-		resp.Aggregates = agg
+		flows = append(flows, FlowSummary{
+			FlowID:         flowID,
+			Method:         entry.method,
+			Scheme:         scheme,
+			Host:           entry.host,
+			Port:           port,
+			Path:           truncatePath(entry.path, maxPathLength),
+			Status:         entry.status,
+			ResponseLength: entry.respLen,
+		})
 	}
+	log.Printf("proxy/list: returning %d flows (fetched %d, filtered %d)", len(flows), len(allEntries), len(allEntries)-len(filtered))
 
 	if maxOffset > lastOffset {
 		s.proxyLastOffset.Store(maxOffset)
 	}
 
-	return &resp, nil
+	return &ProxyListResponse{Flows: flows}, nil
 }
 
 // applyClientFilters applies filters that can't be expressed in Burp regex.

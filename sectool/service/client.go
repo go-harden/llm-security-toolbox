@@ -291,7 +291,16 @@ func (c *Client) doJSONRequest(ctx context.Context, path string, reqBody interfa
 // Proxy API
 // =============================================================================
 
-// ProxyList lists proxy history entries.
+// ProxySummary returns aggregated proxy history summary.
+func (c *Client) ProxySummary(ctx context.Context, req *ProxyListRequest) (*ProxySummaryResponse, error) {
+	var resp ProxySummaryResponse
+	if err := c.doJSONRequest(ctx, "/proxy/summary", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// ProxyList lists proxy history entries as individual flows.
 func (c *Client) ProxyList(ctx context.Context, req *ProxyListRequest) (*ProxyListResponse, error) {
 	var resp ProxyListResponse
 	if err := c.doJSONRequest(ctx, "/proxy/list", req, &resp); err != nil {
