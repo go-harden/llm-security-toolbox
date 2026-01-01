@@ -69,6 +69,14 @@ func inferSchemeAndPort(host string) (scheme string, port int, hostOnly string) 
 	return scheme, port, hostOnly
 }
 
+func readResponseBytes(resp []byte) (*http.Response, error) {
+	// Converts "HTTP/2 " to "HTTP/2.0 " since Go's parser requires major.minor format.
+	if bytes.HasPrefix(resp, []byte("HTTP/2 ")) {
+		resp = append([]byte("HTTP/2.0 "), resp[7:]...)
+	}
+	return http.ReadResponse(bufio.NewReader(bytes.NewReader(resp)), nil)
+}
+
 // previewBody returns a UTF-8 safe preview of the body.
 // Returns "<BINARY>" for non-UTF-8 content.
 func previewBody(body []byte, maxLen int) string {
@@ -82,14 +90,6 @@ func previewBody(body []byte, maxLen int) string {
 		return string(body)
 	}
 	return string(body[:maxLen]) + "..."
-}
-
-func readResponseBytes(resp []byte) (*http.Response, error) {
-	// Converts "HTTP/2 " to "HTTP/2.0 " since Go's parser requires major.minor format.
-	if bytes.HasPrefix(resp, []byte("HTTP/2 ")) {
-		resp = append([]byte("HTTP/2.0 "), resp[7:]...)
-	}
-	return http.ReadResponse(bufio.NewReader(bytes.NewReader(resp)), nil)
 }
 
 // transformRequestForValidation converts HTTP/2 request lines to HTTP/1.1 for Go's parser.
