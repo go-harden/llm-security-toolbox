@@ -30,9 +30,9 @@ type Server struct {
 	cfg            *config.Config
 
 	// MCP server settings
-	mcpEnabled         bool
-	mcpPort            int
-	mcpDisableWorkflow bool
+	mcpEnabled      bool
+	mcpPort         int
+	mcpWorkflowMode string
 
 	// Runtime state
 	listener   net.Listener
@@ -74,17 +74,17 @@ func NewServer(flags DaemonFlags) (*Server, error) {
 	}
 
 	s := &Server{
-		paths:              NewServicePaths(flags.WorkDir),
-		flagBurpMCPURL:     flags.BurpMCPURL,
-		mcpEnabled:         flags.MCP,
-		mcpPort:            flags.MCPPort,
-		mcpDisableWorkflow: flags.DisableWorkflow,
-		metricProvider:     make(map[string]HealthMetricProvider),
-		started:            make(chan struct{}),
-		shutdownCh:         make(chan struct{}),
-		flowStore:          store.NewFlowStore(),
-		crawlFlowStore:     store.NewCrawlFlowStore(),
-		requestStore:       store.NewRequestStore(),
+		paths:           NewServicePaths(flags.WorkDir),
+		flagBurpMCPURL:  flags.BurpMCPURL,
+		mcpEnabled:      flags.MCP,
+		mcpPort:         flags.MCPPort,
+		mcpWorkflowMode: flags.WorkflowMode,
+		metricProvider:  make(map[string]HealthMetricProvider),
+		started:         make(chan struct{}),
+		shutdownCh:      make(chan struct{}),
+		flowStore:       store.NewFlowStore(),
+		crawlFlowStore:  store.NewCrawlFlowStore(),
+		requestStore:    store.NewRequestStore(),
 	}
 
 	// Register health metrics for store counts
@@ -158,7 +158,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Start MCP SSE server if enabled
 	if s.mcpEnabled {
-		s.mcpServer = newMCPServer(s, !s.mcpDisableWorkflow)
+		s.mcpServer = newMCPServer(s, s.mcpWorkflowMode)
 		if err := s.mcpServer.Start(s.mcpPort); err != nil {
 			return fmt.Errorf("failed to start MCP server: %w", err)
 		}

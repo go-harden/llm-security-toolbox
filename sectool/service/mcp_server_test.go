@@ -30,11 +30,11 @@ func setupMCPServer(t *testing.T) (*Server, *client.Client, func()) {
 
 	workDir := t.TempDir()
 	srv, err := NewServer(DaemonFlags{
-		WorkDir:         workDir,
-		BurpMCPURL:      config.DefaultBurpMCPURL,
-		MCP:             true,
-		MCPPort:         0, // Let OS pick a port
-		DisableWorkflow: true,
+		WorkDir:      workDir,
+		BurpMCPURL:   config.DefaultBurpMCPURL,
+		MCP:          true,
+		MCPPort:      0, // Let OS pick a port
+		WorkflowMode: WorkflowModeNone,
 	})
 	require.NoError(t, err)
 

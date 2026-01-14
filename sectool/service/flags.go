@@ -14,12 +14,19 @@ import (
 
 const DefaultMCPPort = 9119
 
+// Workflow mode constants
+const (
+	WorkflowModeNone       = "none"
+	WorkflowModeExplore    = "explore"
+	WorkflowModeTestReport = "test-report"
+)
+
 type DaemonFlags struct {
-	WorkDir         string
-	BurpMCPURL      string
-	MCP             bool
-	MCPPort         int
-	DisableWorkflow bool
+	WorkDir      string
+	BurpMCPURL   string
+	MCP          bool
+	MCPPort      int
+	WorkflowMode string // "", "none", "explore", "test-report"
 }
 
 func ParseDaemonFlags(args []string) (DaemonFlags, error) {
@@ -38,10 +45,23 @@ func ParseDaemonFlags(args []string) (DaemonFlags, error) {
 	fs.StringVar(&flags.BurpMCPURL, "burp-mcp-url", flags.BurpMCPURL, "Burp MCP SSE endpoint URL")
 	fs.BoolVar(&flags.MCP, "mcp", false, "enable MCP SSE server")
 	fs.IntVar(&flags.MCPPort, "mcp-port", flags.MCPPort, "MCP SSE server port")
-	fs.BoolVar(&flags.DisableWorkflow, "disable-workflow", false, "disable workflow tool requirement in MCP mode")
+	fs.StringVar(&flags.WorkflowMode, "workflow", "", "MCP workflow mode: none, explore, test-report")
 
 	if err := fs.Parse(args); err != nil {
 		return flags, err
+	}
+
+	// Validate --workflow requires --mcp
+	if flags.WorkflowMode != "" && !flags.MCP {
+		return flags, errors.New("--workflow requires --mcp")
+	}
+
+	// Validate workflow mode value
+	switch flags.WorkflowMode {
+	case "", WorkflowModeNone, WorkflowModeExplore, WorkflowModeTestReport:
+		// Valid
+	default:
+		return flags, fmt.Errorf("invalid --workflow value %q: must be none, explore, or test-report", flags.WorkflowMode)
 	}
 
 	return flags, nil
@@ -93,7 +113,7 @@ MCP Server Mode:
 
 To start the service with MCP support for Claude Code or Codex integration:
 
-  sectool --mcp [--mcp-port PORT]
+  sectool --mcp [--mcp-port PORT] [--workflow MODE]
 
 This starts both the CLI service and an MCP SSE server. Configuration
 instructions for Claude Code and Codex will be printed on startup.
@@ -101,7 +121,11 @@ instructions for Claude Code and Codex will be printed on startup.
 Options:
   --mcp                  Enable MCP SSE server
   --mcp-port PORT        MCP server port (default: 9119)
-  --disable-workflow     Disable workflow tool requirement
+  --workflow MODE        Set workflow mode (requires --mcp):
+                           (default)     Require workflow tool call first
+                           none          No workflow, all tools available
+                           explore       Exploration instructions, all tools
+                           test-report   Validation instructions, no crawl tools
 `)
 }
 

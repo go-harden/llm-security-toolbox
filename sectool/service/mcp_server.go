@@ -31,23 +31,36 @@ type mcpServer struct {
 	listener  net.Listener
 	service   *Server
 
-	workflowEnabled     bool
+	// workflowMode controls workflow behavior:
+	// ""            - workflow tool required before other tools work
+	// "none"        - no workflow, all tools available immediately
+	// "explore"     - explore instructions in server description, all tools
+	// "test-report" - test-report instructions, no crawl tools
+	workflowMode        string
 	workflowInitialized atomic.Bool
 }
 
 // newMCPServer creates a new MCP server instance.
-func newMCPServer(svc *Server, workflowEnabled bool) *mcpServer {
-	mcpSrv := server.NewMCPServer(
-		"sectool",
-		config.Version,
+func newMCPServer(svc *Server, workflowMode string) *mcpServer {
+	opts := []server.ServerOption{
 		server.WithToolCapabilities(false),
 		server.WithLogging(),
-	)
+	}
+
+	// Add instructions based on workflow mode
+	switch workflowMode {
+	case WorkflowModeExplore:
+		opts = append(opts, server.WithInstructions(workflowExploreContent))
+	case WorkflowModeTestReport:
+		opts = append(opts, server.WithInstructions(workflowTestReportContent))
+	}
+
+	mcpSrv := server.NewMCPServer("sectool", config.Version, opts...)
 
 	m := &mcpServer{
-		server:          mcpSrv,
-		service:         svc,
-		workflowEnabled: workflowEnabled,
+		server:       mcpSrv,
+		service:      svc,
+		workflowMode: workflowMode,
 	}
 
 	m.registerTools()
@@ -92,14 +105,32 @@ func (m *mcpServer) Close(ctx context.Context) error {
 	return nil
 }
 
-// registerTools registers all MCP tools.
+// registerTools registers MCP tools based on workflow mode.
 func (m *mcpServer) registerTools() {
-	// Workflow tool (when enabled)
-	if m.workflowEnabled {
+	switch m.workflowMode {
+	case WorkflowModeNone, WorkflowModeExplore: // workflow requirements disabled or pre-set, all tools available
+		m.addProxyTools()
+		m.addReplayTools()
+		m.addOastTools()
+		m.addEncodeTools()
+		m.addCrawlTools()
+	case WorkflowModeTestReport:
+		m.addProxyTools()
+		m.addReplayTools()
+		m.addOastTools()
+		m.addEncodeTools()
+		// crawl tools excluded
+	default: // Empty (default) workflowMode: require workflow tool call first, all tools registered
 		m.server.AddTool(m.workflowTool(), m.handleWorkflow)
+		m.addProxyTools()
+		m.addReplayTools()
+		m.addOastTools()
+		m.addEncodeTools()
+		m.addCrawlTools()
 	}
+}
 
-	// Proxy tools
+func (m *mcpServer) addProxyTools() {
 	m.server.AddTool(m.proxySummaryTool(), m.handleProxySummary)
 	m.server.AddTool(m.proxyListTool(), m.handleProxyList)
 	m.server.AddTool(m.proxyGetTool(), m.handleProxyGet)
@@ -107,25 +138,29 @@ func (m *mcpServer) registerTools() {
 	m.server.AddTool(m.proxyRuleAddTool(), m.handleProxyRuleAdd)
 	m.server.AddTool(m.proxyRuleUpdateTool(), m.handleProxyRuleUpdate)
 	m.server.AddTool(m.proxyRuleDeleteTool(), m.handleProxyRuleDelete)
+}
 
-	// Replay tools
+func (m *mcpServer) addReplayTools() {
 	m.server.AddTool(m.replaySendTool(), m.handleReplaySend)
 	m.server.AddTool(m.replayGetTool(), m.handleReplayGet)
 	m.server.AddTool(m.requestSendTool(), m.handleRequestSend)
+}
 
-	// OAST tools
+func (m *mcpServer) addOastTools() {
 	m.server.AddTool(m.oastCreateTool(), m.handleOastCreate)
 	m.server.AddTool(m.oastPollTool(), m.handleOastPoll)
 	m.server.AddTool(m.oastGetTool(), m.handleOastGet)
 	m.server.AddTool(m.oastListTool(), m.handleOastList)
 	m.server.AddTool(m.oastDeleteTool(), m.handleOastDelete)
+}
 
-	// Encode tools
+func (m *mcpServer) addEncodeTools() {
 	m.server.AddTool(m.encodeURLTool(), m.handleEncodeURL)
 	m.server.AddTool(m.encodeBase64Tool(), m.handleEncodeBase64)
 	m.server.AddTool(m.encodeHTMLTool(), m.handleEncodeHTML)
+}
 
-	// Crawler tools
+func (m *mcpServer) addCrawlTools() {
 	m.server.AddTool(m.crawlCreateTool(), m.handleCrawlCreate)
 	m.server.AddTool(m.crawlSeedTool(), m.handleCrawlSeed)
 	m.server.AddTool(m.crawlStatusTool(), m.handleCrawlStatus)
@@ -139,8 +174,9 @@ func (m *mcpServer) registerTools() {
 const workflowNotInitializedError = "call workflow first with the relevant task, use 'explore' if there is no better fit"
 
 // requireWorkflow returns an error result if workflow is required but not initialized, nil otherwise.
+// Only enforced when workflowMode is empty (default behavior).
 func (m *mcpServer) requireWorkflow() *mcp.CallToolResult {
-	if m.workflowEnabled && !m.workflowInitialized.Load() {
+	if m.workflowMode == "" && !m.workflowInitialized.Load() {
 		return errorResult(workflowNotInitializedError)
 	}
 	return nil
@@ -160,13 +196,13 @@ Returns necessary instructions on tool use and user interaction  strategies.`),
 }
 
 func (m *mcpServer) handleWorkflow(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	task := req.GetString("task", "explore")
+	task := req.GetString("task", WorkflowModeExplore)
 
 	var content string
 	switch task {
-	case "explore":
+	case WorkflowModeExplore:
 		content = workflowExploreContent
-	case "test-report":
+	case WorkflowModeTestReport:
 		content = workflowTestReportContent
 	default:
 		return errorResult("invalid task: use 'explore' or 'test-report'"), nil
