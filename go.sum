@@ -28,8 +28,6 @@ github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHk
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/go-analyze/bulk v0.1.3 h1:pzRdBqzHDAT9PyROt0SlWE0YqPtdmTcEpIJY0C3vF0c=
 github.com/go-analyze/bulk v0.1.3/go.mod h1:afon/KtFJYnekIyN20H/+XUvcLFjE8sKR1CfpqfClgM=
-github.com/go-harden/interactsh-lite v0.0.1 h1:Ks2Zno7NYtOI0/3bFNB+TppqYVOJe6vszv8F2q2cJO0=
-github.com/go-harden/interactsh-lite v0.0.1/go.mod h1:tP/5kscdvh+KuS5wyuSZ31lHtWuzdWpmhhWhGrQcFNc=
 github.com/go-harden/interactsh-lite v0.1.0 h1:31fQQPZnen2B3ijjLjUfZsYHfis8p2AeR19LOs2KrZA=
 github.com/go-harden/interactsh-lite v0.1.0/go.mod h1:XV1Av0IRMol+63np/oY/PmZ1zvrZK2r++XUGUh1OWIo=
 github.com/go-harden/scout v0.0.1 h1:LsUFkic7WtL1xB7curANFNrb9/zT+V0C8/z61BKu5M4=
