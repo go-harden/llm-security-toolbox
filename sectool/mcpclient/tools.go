@@ -142,6 +142,9 @@ func (c *Client) ReplaySend(ctx context.Context, opts ReplaySendOpts) (*protocol
 	args := map[string]interface{}{
 		"flow_id": opts.FlowID,
 	}
+	if opts.Method != "" {
+		args["method"] = opts.Method
+	}
 	if opts.Body != "" {
 		args["body"] = opts.Body
 	}

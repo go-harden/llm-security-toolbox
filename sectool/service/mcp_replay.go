@@ -22,6 +22,7 @@ func (m *mcpServer) replaySendTool() mcp.Tool {
 Returns: replay_id, status, headers, response_preview. Full body via replay_get.
 
 Edits:
+- method: override HTTP method (GET, POST, PUT, DELETE, etc.)
 - target: scheme+host[:port] (e.g., 'https://staging.example.com')
 - path/query: override path or entire query string
 - set_query/remove_query: selective query param edits
@@ -35,6 +36,7 @@ Types auto-parsed: null/true/false/numbers/{}/[], else string.
 Processing: remove_* then set_*. Content-Length/Host auto-updated.
 Validation: fix issues or use force=true for protocol testing.`),
 		mcp.WithString("flow_id", mcp.Required(), mcp.Description("Flow ID from proxy_poll or crawl_poll to use as base request")),
+		mcp.WithString("method", mcp.Description("Override HTTP method (GET, POST, PUT, DELETE, PATCH, etc.)")),
 		mcp.WithString("body", mcp.Description("Request body content (replaces existing body)")),
 		mcp.WithString("target", mcp.Description("Override destination (scheme+host[:port]); keeps original path/query")),
 		mcp.WithArray("add_headers", mcp.Items(map[string]interface{}{"type": "string"}), mcp.Description("Headers to add/replace (format: 'Name: Value')")),
@@ -103,6 +105,7 @@ func (m *mcpServer) handleReplaySend(ctx context.Context, req mcp.CallToolReques
 	}
 
 	rawRequest = modifyRequestLine(rawRequest, &PathQueryOpts{
+		Method:      req.GetString("method", ""),
 		Path:        req.GetString("path", ""),
 		Query:       req.GetString("query", ""),
 		SetQuery:    req.GetStringSlice("set_query", nil),

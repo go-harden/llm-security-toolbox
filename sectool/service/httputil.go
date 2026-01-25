@@ -282,17 +282,18 @@ func parseHeadersToMap(raw string) map[string][]string {
 	return result
 }
 
-// PathQueryOpts contains options for modifying the path and query string.
+// PathQueryOpts contains options for modifying the request line.
 type PathQueryOpts struct {
+	Method      string   // replace HTTP method
 	Path        string   // replace entire path (without query)
 	Query       string   // replace entire query string
 	SetQuery    []string // add or replace query params ("key=value")
 	RemoveQuery []string // remove query params by key
 }
 
-// HasModifications returns true if any path/query modification is specified.
+// HasModifications returns true if any request line modification is specified.
 func (o *PathQueryOpts) HasModifications() bool {
-	return o.Path != "" || o.Query != "" || len(o.SetQuery) > 0 || len(o.RemoveQuery) > 0
+	return o.Method != "" || o.Path != "" || o.Query != "" || len(o.SetQuery) > 0 || len(o.RemoveQuery) > 0
 }
 
 // parseRequestLine parses the HTTP request line into method, path, query, and version.
@@ -360,6 +361,11 @@ func modifyRequestLine(raw []byte, opts *PathQueryOpts) []byte {
 	method, path, query, version := parseRequestLine(firstLine)
 	if method == "" {
 		return raw
+	}
+
+	// Apply method replacement
+	if opts.Method != "" {
+		method = opts.Method
 	}
 
 	// Apply path replacement

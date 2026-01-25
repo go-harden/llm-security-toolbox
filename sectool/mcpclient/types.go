@@ -45,6 +45,7 @@ type RuleUpdateOpts struct {
 // ReplaySendOpts are options for ReplaySend.
 type ReplaySendOpts struct {
 	FlowID          string
+	Method          string
 	Body            string
 	Target          string
 	AddHeaders      []string

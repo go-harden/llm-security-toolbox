@@ -262,6 +262,7 @@ func TestMCP_ReplaySendModifications(t *testing.T) {
 		name string
 		args map[string]interface{}
 	}{
+		{name: "with_method_override", args: map[string]interface{}{"method": "PUT"}},
 		{name: "with_target_override", args: map[string]interface{}{"target": "https://staging.test:8443"}},
 		{
 			name: "with_header_modifications",

@@ -470,6 +470,24 @@ func TestModifyRequestLine(t *testing.T) {
 			opts:     &PathQueryOpts{Path: "/api/v2/test"},
 			expected: "GET /api/v2/test HTTP/2\r\nHost: example.com\r\n\r\n",
 		},
+		{
+			name:     "replace_method",
+			input:    []byte("GET /api/users HTTP/1.1\r\nHost: example.com\r\n\r\n"),
+			opts:     &PathQueryOpts{Method: "POST"},
+			expected: "POST /api/users HTTP/1.1\r\nHost: example.com\r\n\r\n",
+		},
+		{
+			name:     "replace_method_with_path",
+			input:    []byte("GET /api/users HTTP/1.1\r\nHost: example.com\r\n\r\n"),
+			opts:     &PathQueryOpts{Method: "DELETE", Path: "/api/users/123"},
+			expected: "DELETE /api/users/123 HTTP/1.1\r\nHost: example.com\r\n\r\n",
+		},
+		{
+			name:     "replace_method_preserves_body",
+			input:    []byte("GET /api/data HTTP/1.1\r\nHost: example.com\r\nContent-Length: 4\r\n\r\ntest"),
+			opts:     &PathQueryOpts{Method: "PUT"},
+			expected: "PUT /api/data HTTP/1.1\r\nHost: example.com\r\nContent-Length: 4\r\n\r\ntest",
+		},
 	}
 
 	for _, tc := range tests {
@@ -492,6 +510,11 @@ func TestPathQueryOptsHasModifications(t *testing.T) {
 			name:     "empty",
 			opts:     PathQueryOpts{},
 			expected: false,
+		},
+		{
+			name:     "method_set",
+			opts:     PathQueryOpts{Method: "POST"},
+			expected: true,
 		},
 		{
 			name:     "path_set",
